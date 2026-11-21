@@ -1,0 +1,2857 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Maze Hunter</title>
+  <meta name="description" content="A top-down forest maze chase game with an A* monster hunter and general-knowledge quiz power-ups." />
+  <meta property="og:title" content="AI Maze Hunter" />
+  <meta property="og:description" content="A top-down forest maze chase game with an A* monster hunter and general-knowledge quiz power-ups." />
+  <meta property="og:type" content="website" />
+  <style>
+    :root {
+      --bg-canopy: #182b1c;
+      --bg-bark: #233b27;
+      --surface-card: #faf5e8;
+      --surface-muted: #efe6cf;
+      --border-soft: rgba(45, 74, 48, 0.2);
+      --text-ink: #1b2b1d;
+      --text-muted: #4b614e;
+      --text-light: #f6f1e2;
+      --accent-amber: #d97706;
+      --accent-amber-hover: #b45309;
+      --accent-green: #2c7a3f;
+      --accent-green-hover: #215e30;
+      --accent-red: #b91c1c;
+      --focus-ring: #f59e0b;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #26422b 0%, #152618 100%);
+      color: var(--text-light);
+      font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      padding: 12px 16px 10px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    /* Top HUD Bar */
+    .hud {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 18px;
+      padding: 10px 18px;
+      background: rgba(20, 36, 23, 0.88);
+      border: 1px solid rgba(235, 213, 167, 0.22);
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+      flex-shrink: 0;
+    }
+
+    .hud-brand {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      color: #f6e7c1;
+      white-space: nowrap;
+    }
+
+    .hud-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 14px;
+      font-size: 0.92rem;
+      color: #dce7d8;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud-item {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .hud-label {
+      color: #9cb39e;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .hud-value {
+      font-weight: 700;
+      color: #fff8e7;
+    }
+
+    .hud-value.is-slow {
+      color: #86efac;
+    }
+
+    .hud-value.is-fast {
+      color: #fca5a5;
+    }
+
+    .hud-hearts {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 1.02rem;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+
+    .heart-full {
+      color: #f87171;
+    }
+
+    .heart-empty {
+      color: rgba(255, 255, 255, 0.28);
+    }
+
+    .hud-sep {
+      color: rgba(235, 213, 167, 0.35);
+    }
+
+    .hud-switch-btn {
+      padding: 4px 10px;
+      border-radius: 7px;
+      border: 1px solid rgba(235, 213, 167, 0.38);
+      background: rgba(255, 255, 255, 0.08);
+      color: #f6e7c1;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .hud-switch-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+      border-color: rgba(235, 213, 167, 0.7);
+    }
+
+    .hud-switch-btn:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    .modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 11px 20px;
+      border: 2px solid #8c6d3f;
+      border-radius: 10px;
+      background: #ffffff;
+      color: var(--text-ink);
+      font-family: inherit;
+      font-size: 0.96rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 140ms ease, border-color 140ms ease;
+    }
+
+    .btn-secondary:hover {
+      background: #fdf6e2;
+      border-color: var(--accent-amber);
+    }
+
+    .btn-secondary:focus-visible {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    /* Main Canvas Stage */
+    .stage {
+      position: relative;
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .board-frame {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      background: #2f4d2d;
+      border: 3px solid #4e7845;
+      border-radius: 14px;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+    }
+
+    canvas#gameCanvas {
+      display: block;
+      border-radius: 8px;
+      background: #ebd5a7;
+      touch-action: none;
+    }
+
+    /* Non-blocking Status Banner (quiz outcome confirmation) */
+    .toast {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-size: 0.94rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 160ms ease, transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      white-space: nowrap;
+      z-index: 15;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.correct {
+      background: #14532d;
+      color: #ecfdf5;
+      border: 1px solid #4ade80;
+    }
+
+    .toast.wrong {
+      background: #7f1d1d;
+      color: #fef2f2;
+      border: 1px solid #f87171;
+    }
+
+    /* Controls Hint Footer */
+    .controls-hint {
+      flex-shrink: 0;
+      font-size: 0.84rem;
+      color: #c5d4c0;
+      text-align: center;
+      letter-spacing: 0.01em;
+      padding-bottom: 2px;
+    }
+
+    .controls-hint kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      margin: 0 1px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #f6e7c1;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(235, 213, 167, 0.28);
+      border-radius: 5px;
+    }
+
+    /* Overlay Screens */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(13, 24, 15, 0.72);
+      backdrop-filter: blur(3px);
+      z-index: 30;
+    }
+
+    .overlay[hidden] {
+      display: none;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 520px;
+      background: var(--surface-card);
+      color: var(--text-ink);
+      border: 2px solid #8c6d3f;
+      border-radius: 16px;
+      padding: 28px 30px;
+      box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-kicker {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .modal-title {
+      margin: 0 0 10px;
+      font-size: clamp(1.55rem, 3vw, 2rem);
+      font-weight: 800;
+      line-height: 1.18;
+      color: #1a2d1c;
+    }
+
+    .modal-subtitle {
+      margin: 0 0 22px;
+      font-size: 1rem;
+      line-height: 1.5;
+      color: #364b39;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 18px;
+      margin: 0 0 22px;
+      padding: 14px 16px;
+      background: var(--surface-muted);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-stat-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .summary-stat-val {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-ink);
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 11px 26px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent-green);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 140ms ease, transform 120ms ease;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-green-hover);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary.is-amber {
+      background: var(--accent-amber);
+    }
+
+    .btn-primary.is-amber:hover {
+      background: var(--accent-amber-hover);
+    }
+
+    .btn-primary:focus-visible,
+    .quiz-option:focus-visible {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    /* Quiz Overlay Specifics */
+    .quiz-question {
+      margin: 0 0 18px;
+      font-size: 1.22rem;
+      font-weight: 800;
+      line-height: 1.38;
+      color: #162518;
+    }
+
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .quiz-option {
+      width: 100%;
+      min-height: 50px;
+      padding: 12px 16px;
+      text-align: left;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.35;
+      color: var(--text-ink);
+      background: #ffffff;
+      border: 2px solid #c9be9f;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+    }
+
+    .quiz-option:hover:not(:disabled) {
+      background: #fdf6e2;
+      border-color: var(--accent-amber);
+    }
+
+    .quiz-option:active:not(:disabled) {
+      transform: scale(0.99);
+    }
+
+    .quiz-option:disabled {
+      cursor: default;
+    }
+
+    .quiz-option.is-correct {
+      background: #dcfce7;
+      border-color: #16a34a;
+      color: #14532d;
+    }
+
+    .quiz-option.is-wrong {
+      background: #fee2e2;
+      border-color: #dc2626;
+      color: #7f1d1d;
+    }
+
+    .quiz-option-key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+      border-radius: 6px;
+      background: var(--surface-muted);
+      color: #364b39;
+      font-size: 0.85rem;
+      font-weight: 800;
+    }
+
+    .quiz-feedback {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.96rem;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .quiz-feedback.correct {
+      background: #dcfce7;
+      color: #14532d;
+      border: 1px solid #86efac;
+    }
+
+    .quiz-feedback.wrong {
+      background: #fee2e2;
+      color: #7f1d1d;
+      border: 1px solid #fca5a5;
+    }
+
+    .quiz-actions {
+      margin-top: 14px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    /* Catch Mode Selector on Start Screen */
+    .mode-group {
+      margin: 0 0 22px;
+    }
+
+    .mode-group-label {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .mode-card {
+      text-align: left;
+      padding: 12px 14px;
+      border: 2px solid #c9be9f;
+      border-radius: 10px;
+      background: #ffffff;
+      color: var(--text-ink);
+      font-family: inherit;
+      cursor: pointer;
+      transition: border-color 120ms ease, background-color 120ms ease;
+    }
+
+    .mode-card:hover {
+      background: #fdf6e2;
+      border-color: var(--accent-amber);
+    }
+
+    .mode-card.is-selected {
+      background: #eef7ee;
+      border-color: var(--accent-green);
+      box-shadow: inset 0 0 0 1px var(--accent-green);
+    }
+
+    .mode-card:focus-visible {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    .mode-card-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      margin-bottom: 3px;
+      color: #162518;
+    }
+
+    .mode-card-desc {
+      font-size: 0.82rem;
+      line-height: 1.35;
+      color: #4b614e;
+    }
+
+    /* Rapid Fire Banner & Shrinking Countdown Bar */
+    .rapid-banner {
+      display: inline-block;
+      padding: 4px 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      background: #991b1b;
+      color: #fef2f2;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .rapid-timer-wrap {
+      margin: 0 0 16px;
+    }
+
+    .rapid-timer-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rapid-timer-track {
+      width: 100%;
+      height: 10px;
+      background: #dfd5bc;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .rapid-timer-bar {
+      height: 100%;
+      width: 100%;
+      background: #d97706;
+      transform-origin: left center;
+      transition: background-color 150ms ease;
+    }
+
+    .rapid-timer-bar.is-urgent {
+      background: #dc2626;
+    }
+
+    @media (max-width: 680px) {
+      #app {
+        padding: 8px 10px;
+        gap: 8px;
+      }
+
+      .hud {
+        padding: 8px 12px;
+        gap: 6px 12px;
+      }
+
+      .hud-brand {
+        font-size: 0.96rem;
+      }
+
+      .hud-metrics {
+        font-size: 0.84rem;
+        gap: 4px 10px;
+      }
+
+      .modal {
+        padding: 22px 20px;
+      }
+
+      .controls-hint {
+        font-size: 0.78rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="hud" aria-label="Game status">
+      <div class="hud-brand">AI Maze Hunter</div>
+      <div class="hud-metrics">
+        <span class="hud-item">
+          <span class="hud-label">Maze</span>
+          <span class="hud-value" id="hudMaze">1 / 3</span>
+        </span>
+        <span class="hud-sep" aria-hidden="true">·</span>
+        <span class="hud-item">
+          <span class="hud-label">Moves</span>
+          <span class="hud-value" id="hudMoves">0</span>
+        </span>
+        <span class="hud-sep" aria-hidden="true">·</span>
+        <span class="hud-item">
+          <span class="hud-label">Hunter Speed</span>
+          <span class="hud-value" id="hudSpeed">1.5 cells/s</span>
+        </span>
+        <span class="hud-sep" aria-hidden="true">·</span>
+        <span class="hud-item">
+          <span class="hud-label">Quiz</span>
+          <span class="hud-value" id="hudQuiz">0 correct / 0 wrong</span>
+        </span>
+        <span class="hud-sep" aria-hidden="true">·</span>
+        <span class="hud-item">
+          <span class="hud-label">Time</span>
+          <span class="hud-value" id="hudTime">00:00</span>
+        </span>
+        <span class="hud-sep" id="hudLivesSep" aria-hidden="true" hidden>·</span>
+        <span class="hud-item" id="hudLivesItem" hidden>
+          <span class="hud-label">Lives</span>
+          <span class="hud-hearts" id="hudHearts" aria-label="3 lives remaining"></span>
+        </span>
+        <button type="button" class="hud-switch-btn" id="btnHudSwitchMode" hidden>Switch to 3 Lives</button>
+      </div>
+    </header>
+
+    <main class="stage" id="stage">
+      <div class="board-frame">
+        <canvas id="gameCanvas" aria-label="Forest maze game board"></canvas>
+      </div>
+      <div class="toast" id="statusToast" role="status" aria-live="polite"></div>
+    </main>
+
+    <footer class="controls-hint">
+      Move with <kbd>Arrow Keys</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · Rapid Fire at move 12, then quiz every 20 moves
+    </footer>
+  </div>
+
+  <!-- Start Screen -->
+  <div class="overlay" id="overlayStart" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+    <div class="modal">
+      <div class="modal-kicker">3 Forest Mazes · A* Monster AI · Knowledge Boosts</div>
+      <h1 class="modal-title" id="startTitle">AI Maze Hunter</h1>
+      <p class="modal-subtitle">
+        Reach the golden exit in all three mazes before the monster catches you—rapid fire hits at move 12, with quizzes every 20 moves after.
+      </p>
+      <div class="mode-group">
+        <div class="mode-group-label">Select Catch Mechanic</div>
+        <div class="mode-grid" role="radiogroup" aria-label="Catch mechanic mode">
+          <button type="button" class="mode-card is-selected" id="modeInstantBtn" role="radio" aria-checked="true">
+            <div class="mode-card-title">Mode A: Instant Game Over</div>
+            <div class="mode-card-desc">Getting caught ends the run immediately.</div>
+          </button>
+          <button type="button" class="mode-card" id="modeLivesBtn" role="radio" aria-checked="false">
+            <div class="mode-card-title">Mode B: 3 Lives</div>
+            <div class="mode-card-desc">Lose 1 heart and reset the hunter to its corner.</div>
+          </button>
+        </div>
+      </div>
+      <button type="button" class="btn-primary is-amber" id="btnStart">Start</button>
+    </div>
+  </div>
+
+  <!-- Quiz Overlay -->
+  <div class="overlay" id="overlayQuiz" role="dialog" aria-modal="true" aria-labelledby="quizQuestion" hidden>
+    <div class="modal">
+      <div class="modal-kicker" id="quizMeta">Science · Move 12</div>
+      <h2 class="quiz-question" id="quizQuestion">Question text</h2>
+      <div class="quiz-options" id="quizOptions"></div>
+      <div class="quiz-feedback" id="quizFeedback" hidden></div>
+      <div class="quiz-actions" id="quizActions" hidden>
+        <button type="button" class="btn-primary" id="btnQuizContinue">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rapid Fire Warning Overlay -->
+  <div class="overlay" id="overlayRapidWarning" role="dialog" aria-modal="true" aria-labelledby="rapidWarnTitle" hidden>
+    <div class="modal">
+      <div class="rapid-banner">RAPID FIRE — 5 questions</div>
+      <h2 class="modal-title" id="rapidWarnTitle">Rapid Fire Round</h2>
+      <p class="modal-subtitle">
+        Rapid fire: 5 questions. The more you get right, the faster the hunter becomes — answer carefully.
+      </p>
+      <div class="summary-grid">
+        <div>
+          <div class="summary-stat-label">Time Per Question</div>
+          <div class="summary-stat-val" id="rapidWarnTime">10 seconds</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Speed Scaling</div>
+          <div class="summary-stat-val">+1 to +3 tiers</div>
+        </div>
+      </div>
+      <button type="button" class="btn-primary is-amber" id="btnRapidStart">Start</button>
+    </div>
+  </div>
+
+  <!-- Rapid Fire Question Overlay -->
+  <div class="overlay" id="overlayRapidQuiz" role="dialog" aria-modal="true" aria-labelledby="rapidQuestion" hidden>
+    <div class="modal">
+      <div class="rapid-banner" id="rapidProgressBanner">RAPID FIRE — Question 1 of 5</div>
+      <div class="rapid-timer-wrap">
+        <div class="rapid-timer-meta">
+          <span id="rapidCategory">Geography</span>
+          <span id="rapidTimeLabel">10.0s</span>
+        </div>
+        <div class="rapid-timer-track">
+          <div class="rapid-timer-bar" id="rapidTimerBar"></div>
+        </div>
+      </div>
+      <h2 class="quiz-question" id="rapidQuestion">Question text</h2>
+      <div class="quiz-options" id="rapidOptions"></div>
+      <div class="quiz-feedback" id="rapidFeedback" hidden></div>
+    </div>
+  </div>
+
+  <!-- Rapid Fire Results Overlay -->
+  <div class="overlay" id="overlayRapidResults" role="dialog" aria-modal="true" aria-labelledby="rapidResultsTitle" hidden>
+    <div class="modal">
+      <div class="rapid-banner">RAPID FIRE COMPLETE</div>
+      <h2 class="modal-title" id="rapidResultsTitle">Score: 0 / 5</h2>
+      <p class="modal-subtitle" id="rapidResultsMsg">0/5 correct — the hunter is now faster.</p>
+      <button type="button" class="btn-primary" id="btnRapidResume">Resume Chase</button>
+    </div>
+  </div>
+
+  <!-- Maze Cleared Overlay -->
+  <div class="overlay" id="overlayCleared" role="dialog" aria-modal="true" aria-labelledby="clearedTitle" hidden>
+    <div class="modal">
+      <div class="modal-kicker" id="clearedKicker">Stage Complete</div>
+      <h2 class="modal-title" id="clearedTitle">Maze Cleared!</h2>
+      <p class="modal-subtitle" id="clearedDesc">You escaped into deeper woods. The monster is picking up speed.</p>
+      <div class="summary-grid">
+        <div>
+          <div class="summary-stat-label">Moves This Maze</div>
+          <div class="summary-stat-val" id="clearedMoves">0</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Next Maze Hunter Speed</div>
+          <div class="summary-stat-val" id="clearedNextSpeed">1.8 cells/s</div>
+        </div>
+      </div>
+      <button type="button" class="btn-primary" id="btnNextMaze">Next Maze</button>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="overlay" id="overlayGameOver" role="dialog" aria-modal="true" aria-labelledby="gameOverTitle" hidden>
+    <div class="modal">
+      <div class="modal-kicker" id="gameOverKicker">Caught in Maze 1</div>
+      <h2 class="modal-title" id="gameOverTitle">The Hunter Caught You!</h2>
+      <p class="modal-subtitle" id="gameOverDesc">The monster tracked you down through the forest trails. Ready for another run?</p>
+      <div class="summary-grid">
+        <div>
+          <div class="summary-stat-label">Moves Made</div>
+          <div class="summary-stat-val" id="overMoves">0</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Quiz Score</div>
+          <div class="summary-stat-val" id="overQuiz">0 correct / 0 wrong</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary is-amber" id="btnRetry">Restart</button>
+        <button type="button" class="btn-secondary" id="btnOverSwitchMode">Play 3 Lives Mode</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Victory Overlay -->
+  <div class="overlay" id="overlayWin" role="dialog" aria-modal="true" aria-labelledby="winTitle" hidden>
+    <div class="modal">
+      <div class="modal-kicker">All 3 Mazes Complete</div>
+      <h2 class="modal-title" id="winTitle">You Outsmarted the Hunter!</h2>
+      <p class="modal-subtitle">You navigated every labyrinth and escaped the forest safely.</p>
+      <div class="summary-grid">
+        <div>
+          <div class="summary-stat-label">Total Time</div>
+          <div class="summary-stat-val" id="winTime">00:00</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Correct Answers</div>
+          <div class="summary-stat-val" id="winCorrect">0</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Total Moves</div>
+          <div class="summary-stat-val" id="winMoves">0</div>
+        </div>
+        <div>
+          <div class="summary-stat-label">Wrong Answers</div>
+          <div class="summary-stat-val" id="winWrong">0</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary" id="btnPlayAgain">Play Again</button>
+        <button type="button" class="btn-secondary" id="btnWinSwitchMode">Play 3 Lives Mode</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      /* ======================================================================
+       * 1. CONSTANTS & CONFIGURATION
+       * ====================================================================== */
+      const WALL = 1;
+      const PATH = 0;
+
+      const MOVE_ANIM_DURATION = 0.12;   // 120ms smooth cell-to-cell slide
+      const RAPID_FIRE_AT_MOVE = 12;     // Rapid Fire triggers once per maze after 12 moves
+      const REGULAR_QUIZ_INTERVAL = 20;  // Regular questions trigger every 20 moves after Rapid Fire
+      const RAPID_FIRE_COUNT = 5;
+      const MODIFIER_DURATION_SEC = 10;
+      const MAX_LIVES = 3;
+
+      // Unified hunter speed ladder (cells per second) used by both regular quiz and Rapid Fire
+      const SPEED_LADDER = [0.9, 1.2, 1.5, 1.8, 2.1, 2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.2, 4.5];
+
+      // Maze size, starting speed tier, loop density, Rapid Fire timer (7s on Maze 3), and icon scale
+      const MAZE_CONFIGS = [
+        { level: 1, size: 15, baseTier: 1, braidRatio: 0.36, rapidSecPerQ: 10, entityScale: 1.00 },
+        { level: 2, size: 21, baseTier: 3, braidRatio: 0.38, rapidSecPerQ: 10, entityScale: 1.24 },
+        { level: 3, size: 27, baseTier: 5, braidRatio: 0.40, rapidSecPerQ: 7,  entityScale: 1.38 }
+      ];
+
+      // Warm forest cartoon color palette
+      const PALETTE = {
+        sandLight: "#ebd5a7",
+        sandAlt: "#e4ca94",
+        sandTrack: "rgba(182, 146, 86, 0.25)",
+        pebble: "#ccb17c",
+        grassBase: "#3b7d34",
+        grassTop: "#4f9b43",
+        grassShadow: "#285824",
+        bushDark: "#2e692a",
+        bushMid: "#478f3b",
+        bushHighlight: "#67b350",
+        treeTrunk: "#6e4b2b",
+        flowerGold: "#f7c948",
+        flowerBerry: "#e05252",
+        exitGlow: "#fcd34d",
+        exitCore: "#f59e0b",
+        startPad: "#c4b684",
+        // Player colors
+        hairOrange: "#de5226",
+        hairHighlight: "#f37649",
+        skinPeach: "#fbd4b4",
+        cheekPink: "#f4978e",
+        shirtBlue: "#2664d9",
+        shirtWhite: "#ffffff",
+        shortsNavy: "#1c366b",
+        shoeBrown: "#5e3c23",
+        // Monster colors
+        monsterGreen: "#3aa341",
+        monsterDark: "#246e2b",
+        monsterBelly: "#6bc45e",
+        monsterMouth: "#380d17",
+        monsterTongue: "#d94f6d",
+        monsterTooth: "#fffdf5",
+        monsterEyeRing: "#f59e0b"
+      };
+
+      const DIRECTIONS = {
+        ArrowUp: { dc: 0, dr: -1 },
+        ArrowDown: { dc: 0, dr: 1 },
+        ArrowLeft: { dc: -1, dr: 0 },
+        ArrowRight: { dc: 1, dr: 0 },
+        KeyW: { dc: 0, dr: -1 },
+        KeyS: { dc: 0, dr: 1 },
+        KeyA: { dc: -1, dr: 0 },
+        KeyD: { dc: 1, dr: 0 }
+      };
+
+      /* ======================================================================
+       * 2. QUIZ QUESTION BANK (70 GENERAL KNOWLEDGE QUESTIONS)
+       * ====================================================================== */
+      const QUESTION_BANK = [
+        // Geography
+        { id: 1, category: "Geography", q: "Which is the longest river in the world?", correct: "Nile", wrong: ["Amazon", "Ganges"] },
+        { id: 2, category: "Geography", q: "What is the capital of Australia?", correct: "Canberra", wrong: ["Sydney", "Melbourne"] },
+        { id: 3, category: "Geography", q: "Which is the largest ocean?", correct: "Pacific", wrong: ["Atlantic", "Indian"] },
+        { id: 4, category: "Geography", q: "Which country has the most time zones?", correct: "France", wrong: ["Russia", "USA"] },
+        { id: 5, category: "Geography", q: "Mount Everest lies on the border of Nepal and which country?", correct: "China", wrong: ["India", "Bhutan"] },
+        { id: 26, category: "Geography", q: "Which is the largest continent?", correct: "Asia", wrong: ["Africa", "North America"] },
+        { id: 27, category: "Geography", q: "What is the capital of Japan?", correct: "Tokyo", wrong: ["Osaka", "Kyoto"] },
+        { id: 28, category: "Geography", q: "Which desert is the largest hot desert?", correct: "Sahara", wrong: ["Gobi", "Thar"] },
+        { id: 29, category: "Geography", q: "Which country is shaped like a boot?", correct: "Italy", wrong: ["Spain", "Greece"] },
+        { id: 30, category: "Geography", q: "Which is the smallest country in the world?", correct: "Vatican City", wrong: ["Monaco", "Malta"] },
+        { id: 31, category: "Geography", q: "Which continent has the most countries?", correct: "Africa", wrong: ["Asia", "Europe"] },
+        { id: 56, category: "Geography", q: "Which river runs through London?", correct: "Thames", wrong: ["Seine", "Danube"] },
+        { id: 57, category: "Geography", q: "What is the capital of Canada?", correct: "Ottawa", wrong: ["Toronto", "Vancouver"] },
+        { id: 58, category: "Geography", q: "Which U.S. state is famous for the Grand Canyon?", correct: "Arizona", wrong: ["Nevada", "Colorado"] },
+        // Science
+        { id: 6, category: "Science", q: "What is the chemical symbol for gold?", correct: "Au", wrong: ["Ag", "Gd"] },
+        { id: 7, category: "Science", q: "How many bones are in the adult human body?", correct: "206", wrong: ["186", "226"] },
+        { id: 8, category: "Science", q: "Which planet is known as the Red Planet?", correct: "Mars", wrong: ["Venus", "Jupiter"] },
+        { id: 9, category: "Science", q: "What gas do plants absorb from the air?", correct: "Carbon dioxide", wrong: ["Oxygen", "Nitrogen"] },
+        { id: 10, category: "Science", q: "What is the hardest natural substance?", correct: "Diamond", wrong: ["Steel", "Quartz"] },
+        { id: 32, category: "Science", q: "What is the most abundant gas in Earth's atmosphere?", correct: "Nitrogen", wrong: ["Oxygen", "Carbon dioxide"] },
+        { id: 33, category: "Science", q: "How many chambers does the human heart have?", correct: "4", wrong: ["2", "3"] },
+        { id: 34, category: "Science", q: "What part of the plant does photosynthesis mainly happen in?", correct: "Leaves", wrong: ["Roots", "Stem"] },
+        { id: 35, category: "Science", q: "What is the speed of light, roughly?", correct: "300,000 km/s", wrong: ["300 km/s", "3,000 km/s"] },
+        { id: 36, category: "Science", q: "Which blood type is the universal donor?", correct: "O negative", wrong: ["AB positive", "A positive"] },
+        { id: 37, category: "Science", q: "What is H₂O more commonly known as?", correct: "Water", wrong: ["Salt", "Hydrogen peroxide"] },
+        { id: 59, category: "Science", q: "Which planet is closest to the Sun?", correct: "Mercury", wrong: ["Venus", "Earth"] },
+        { id: 60, category: "Science", q: "At sea level, at what temperature does water freeze?", correct: "0°C", wrong: ["10°C", "-10°C"] },
+        { id: 61, category: "Science", q: "Which organ pumps blood throughout the human body?", correct: "Heart", wrong: ["Liver", "Lungs"] },
+        // History
+        { id: 11, category: "History", q: "In which year did World War II end?", correct: "1945", wrong: ["1943", "1947"] },
+        { id: 12, category: "History", q: "Who was the first President of the United States?", correct: "Washington", wrong: ["Lincoln", "Jefferson"] },
+        { id: 13, category: "History", q: "The Taj Mahal was built by which Mughal emperor?", correct: "Shah Jahan", wrong: ["Akbar", "Aurangzeb"] },
+        { id: 14, category: "History", q: "Which ancient civilization built the pyramids at Giza?", correct: "Egyptians", wrong: ["Romans", "Greeks"] },
+        { id: 15, category: "History", q: "Who wrote the Indian national anthem?", correct: "Rabindranath Tagore", wrong: ["Bankim Chandra", "Sarojini Naidu"] },
+        { id: 38, category: "History", q: "Who was the first person to walk on the Moon?", correct: "Neil Armstrong", wrong: ["Buzz Aldrin", "Yuri Gagarin"] },
+        { id: 39, category: "History", q: "In which year did India gain independence?", correct: "1947", wrong: ["1945", "1950"] },
+        { id: 40, category: "History", q: "The Great Wall was built in which country?", correct: "China", wrong: ["Japan", "Mongolia"] },
+        { id: 41, category: "History", q: "Who was known as the \"Iron Man of India\"?", correct: "Sardar Patel", wrong: ["Nehru", "Bhagat Singh"] },
+        { id: 42, category: "History", q: "Which empire built the Colosseum?", correct: "Roman", wrong: ["Greek", "Persian"] },
+        { id: 62, category: "History", q: "Which famous ship sank in the North Atlantic in 1912?", correct: "Titanic", wrong: ["Mayflower", "Santa Maria"] },
+        { id: 63, category: "History", q: "Who painted the Mona Lisa?", correct: "Leonardo da Vinci", wrong: ["Pablo Picasso", "Vincent van Gogh"] },
+        // Sports
+        { id: 16, category: "Sports", q: "How many players are on a football team on the field?", correct: "11", wrong: ["9", "13"] },
+        { id: 17, category: "Sports", q: "In which sport is the term \"love\" used?", correct: "Tennis", wrong: ["Badminton", "Squash"] },
+        { id: 18, category: "Sports", q: "How often are the Summer Olympics held?", correct: "Every 4 years", wrong: ["Every 2 years", "Every 5 years"] },
+        { id: 19, category: "Sports", q: "Which country won the 2011 Cricket World Cup?", correct: "India", wrong: ["Australia", "Sri Lanka"] },
+        { id: 20, category: "Sports", q: "How many rings are on the Olympic flag?", correct: "5", wrong: ["4", "6"] },
+        { id: 43, category: "Sports", q: "How many players are on a basketball team on court?", correct: "5", wrong: ["4", "6"] },
+        { id: 44, category: "Sports", q: "In cricket, how many balls are in an over?", correct: "6", wrong: ["4", "8"] },
+        { id: 45, category: "Sports", q: "Which sport uses a shuttlecock?", correct: "Badminton", wrong: ["Tennis", "Squash"] },
+        { id: 46, category: "Sports", q: "How long is an Olympic swimming pool?", correct: "50 m", wrong: ["25 m", "100 m"] },
+        { id: 47, category: "Sports", q: "Which country has won the most FIFA World Cups?", correct: "Brazil", wrong: ["Germany", "Argentina"] },
+        { id: 64, category: "Sports", q: "In which sport do players try to score a hole-in-one?", correct: "Golf", wrong: ["Polo", "Hockey"] },
+        { id: 65, category: "Sports", q: "Which Wimbledon surface are matches played on?", correct: "Grass", wrong: ["Clay", "Hard court"] },
+        // Technology
+        { id: 21, category: "Technology", q: "What does \"CPU\" stand for?", correct: "Central Processing Unit", wrong: ["Central Program Utility", "Computer Personal Unit"] },
+        { id: 22, category: "Technology", q: "Who is considered the father of computer science?", correct: "Alan Turing", wrong: ["Bill Gates", "Steve Jobs"] },
+        { id: 23, category: "Technology", q: "What does \"HTML\" stand for?", correct: "HyperText Markup Language", wrong: ["High Text Machine Language", "Hyperlink Markup Logic"] },
+        { id: 24, category: "Technology", q: "Which company developed the Python language?", correct: "It was a community project, not a company", wrong: ["Microsoft", "Google"] },
+        { id: 25, category: "Technology", q: "How many bits are in a byte?", correct: "8", wrong: ["4", "16"] },
+        { id: 48, category: "Technology", q: "What does \"WWW\" stand for?", correct: "World Wide Web", wrong: ["World Web Wide", "Wide World Web"] },
+        { id: 49, category: "Technology", q: "Which language is mainly used to style web pages?", correct: "CSS", wrong: ["HTML", "Python"] },
+        { id: 50, category: "Technology", q: "What does \"AI\" stand for?", correct: "Artificial Intelligence", wrong: ["Automated Input", "Advanced Interface"] },
+        { id: 51, category: "Technology", q: "Which of these is an operating system?", correct: "Linux", wrong: ["Chrome", "Photoshop"] },
+        { id: 52, category: "Technology", q: "What does \"RAM\" stand for?", correct: "Random Access Memory", wrong: ["Read Access Memory", "Rapid Access Module"] },
+        { id: 66, category: "Technology", q: "What does \"USB\" stand for?", correct: "Universal Serial Bus", wrong: ["Unified System Board", "Ultra Speed Backup"] },
+        { id: 67, category: "Technology", q: "Which keyboard shortcut commonly copies selected text on Windows?", correct: "Ctrl + C", wrong: ["Ctrl + V", "Ctrl + X"] },
+        // General
+        { id: 53, category: "General", q: "How many colours are in a rainbow?", correct: "7", wrong: ["5", "9"] },
+        { id: 54, category: "General", q: "How many minutes are in a full day?", correct: "1,440", wrong: ["1,240", "1,640"] },
+        { id: 55, category: "General", q: "Which is the only mammal that can truly fly?", correct: "Bat", wrong: ["Flying squirrel", "Sugar glider"] },
+        { id: 68, category: "General", q: "How many sides does a hexagon have?", correct: "6", wrong: ["5", "8"] },
+        { id: 69, category: "General", q: "Which season comes right after winter?", correct: "Spring", wrong: ["Autumn", "Summer"] },
+        { id: 70, category: "General", q: "How many days are in a leap year?", correct: "366", wrong: ["365", "364"] }
+      ];
+
+      /* ======================================================================
+       * 3. STATE MACHINE & GAME STATE
+       * ====================================================================== */
+      // Valid states: 'start' | 'playing' | 'quiz' | 'rapid_warning' | 'rapid_quiz' | 'rapid_results' | 'cleared' | 'gameover' | 'win'
+      const state = {
+        mode: "start",
+        catchMode: "instant", // 'instant' (Mode A) | 'lives' (Mode B)
+        lives: MAX_LIVES,
+        caughtFlashTimer: 0,
+
+        mazeIndex: 0,
+        grid: [],
+        decorSeed: [],
+        size: 15,
+        startCell: { col: 1, row: 1 },
+        exitCell: { col: 13, row: 13 },
+        hunterSpawnCell: { col: 13, row: 1 },
+
+        player: {
+          col: 1,
+          row: 1,
+          fromCol: 1,
+          fromRow: 1,
+          visCol: 1,
+          visRow: 1,
+          animTime: MOVE_ANIM_DURATION,
+          facingDc: 0,
+          facingDr: 1,
+          stepParity: 0
+        },
+
+        hunter: {
+          col: 13,
+          row: 1,
+          fromCol: 13,
+          fromRow: 1,
+          visCol: 13,
+          visRow: 1,
+          animTime: MOVE_ANIM_DURATION,
+          facingDc: -1,
+          facingDr: 0,
+          stepParity: 0,
+          path: []
+        },
+
+        queuedDirection: null,
+        totalMoves: 0,
+        mazeMoves: 0,
+        movesSinceQuiz: 0,
+        rapidFireDoneThisMaze: false,
+
+        correctAnswers: 0,
+        wrongAnswers: 0,
+        elapsedSeconds: 0,
+
+        hunterTier: 1,
+        hunterStepTimer: 0,
+        speedModifierType: "none", // 'none' | 'slow' | 'fast'
+        speedModifierTimeLeft: 0,
+
+        questionDeck: [],
+        activeQuiz: null,
+        quizLocked: false,
+
+        rapidQuestions: [],
+        rapidIndex: 0,
+        rapidScore: 0,
+        rapidTimeLeft: 10,
+        rapidQuestionLocked: false,
+
+        toastTimer: 0,
+        pulseClock: 0
+      };
+
+      // DOM References
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const stageEl = document.getElementById("stage");
+
+      const hudMaze = document.getElementById("hudMaze");
+      const hudMoves = document.getElementById("hudMoves");
+      const hudSpeed = document.getElementById("hudSpeed");
+      const hudQuiz = document.getElementById("hudQuiz");
+      const hudTime = document.getElementById("hudTime");
+      const hudLivesSep = document.getElementById("hudLivesSep");
+      const hudLivesItem = document.getElementById("hudLivesItem");
+      const hudHearts = document.getElementById("hudHearts");
+      const btnHudSwitchMode = document.getElementById("btnHudSwitchMode");
+      const btnOverSwitchMode = document.getElementById("btnOverSwitchMode");
+      const btnWinSwitchMode = document.getElementById("btnWinSwitchMode");
+      const statusToast = document.getElementById("statusToast");
+
+      const overlayStart = document.getElementById("overlayStart");
+      const overlayQuiz = document.getElementById("overlayQuiz");
+      const overlayRapidWarning = document.getElementById("overlayRapidWarning");
+      const overlayRapidQuiz = document.getElementById("overlayRapidQuiz");
+      const overlayRapidResults = document.getElementById("overlayRapidResults");
+      const overlayCleared = document.getElementById("overlayCleared");
+      const overlayGameOver = document.getElementById("overlayGameOver");
+      const overlayWin = document.getElementById("overlayWin");
+
+      const quizMeta = document.getElementById("quizMeta");
+      const quizQuestion = document.getElementById("quizQuestion");
+      const quizOptions = document.getElementById("quizOptions");
+      const quizFeedback = document.getElementById("quizFeedback");
+      const quizActions = document.getElementById("quizActions");
+
+      const rapidProgressBanner = document.getElementById("rapidProgressBanner");
+      const rapidCategory = document.getElementById("rapidCategory");
+      const rapidTimeLabel = document.getElementById("rapidTimeLabel");
+      const rapidTimerBar = document.getElementById("rapidTimerBar");
+      const rapidQuestion = document.getElementById("rapidQuestion");
+      const rapidOptions = document.getElementById("rapidOptions");
+      const rapidFeedback = document.getElementById("rapidFeedback");
+
+      let boardPixelSize = 540;
+      let cellSize = 36;
+      let toastTimeoutId = null;
+
+      /* ======================================================================
+       * 4. MAZE DATA & PROCEDURAL GENERATOR
+       * ====================================================================== */
+      function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const tmp = arr[i];
+          arr[i] = arr[j];
+          arr[j] = tmp;
+        }
+        return arr;
+      }
+
+      function computeBfsDistances(grid, startCol, startRow) {
+        const size = grid.length;
+        const dist = Array.from({ length: size }, () => new Array(size).fill(-1));
+        const queue = [{ col: startCol, row: startRow }];
+        dist[startRow][startCol] = 0;
+
+        let head = 0;
+        const dirs = [
+          [0, -1],
+          [1, 0],
+          [0, 1],
+          [-1, 0]
+        ];
+
+        while (head < queue.length) {
+          const cur = queue[head++];
+          const nextDist = dist[cur.row][cur.col] + 1;
+
+          for (let i = 0; i < dirs.length; i++) {
+            const nc = cur.col + dirs[i][0];
+            const nr = cur.row + dirs[i][1];
+            if (nc >= 0 && nc < size && nr >= 0 && nr < size) {
+              if (grid[nr][nc] === PATH && dist[nr][nc] === -1) {
+                dist[nr][nc] = nextDist;
+                queue.push({ col: nc, row: nr });
+              }
+            }
+          }
+        }
+        return dist;
+      }
+
+      function generateMaze(config) {
+        const size = config.size;
+        const grid = Array.from({ length: size }, () => new Array(size).fill(WALL));
+
+        // Deterministic decorative variation per cell for trees, bushes, pebbles
+        const decor = Array.from({ length: size }, (_, r) =>
+          Array.from({ length: size }, (__, c) => {
+            const hash = Math.abs(Math.sin(c * 12.9898 + r * 78.233 + config.level * 43.17) * 43758.5453);
+            return hash - Math.floor(hash);
+          })
+        );
+
+        // Iterative Randomized DFS (Recursive Backtracker)
+        const startCol = 1;
+        const startRow = 1;
+        grid[startRow][startCol] = PATH;
+        const stack = [{ col: startCol, row: startRow }];
+        const carveDirs = [
+          [0, -2],
+          [2, 0],
+          [0, 2],
+          [-2, 0]
+        ];
+
+        while (stack.length > 0) {
+          const top = stack[stack.length - 1];
+          const candidates = [];
+
+          for (let i = 0; i < carveDirs.length; i++) {
+            const nc = top.col + carveDirs[i][0];
+            const nr = top.row + carveDirs[i][1];
+            if (nc > 0 && nc < size - 1 && nr > 0 && nr < size - 1 && grid[nr][nc] === WALL) {
+              candidates.push({
+                nc,
+                nr,
+                mc: top.col + carveDirs[i][0] / 2,
+                mr: top.row + carveDirs[i][1] / 2
+              });
+            }
+          }
+
+          if (candidates.length === 0) {
+            stack.pop();
+          } else {
+            const pick = candidates[Math.floor(Math.random() * candidates.length)];
+            grid[pick.mr][pick.mc] = PATH;
+            grid[pick.nr][pick.nc] = PATH;
+            stack.push({ col: pick.nc, row: pick.nr });
+          }
+        }
+
+        // Controlled braiding: open bridge walls separating parallel corridors
+        // so the player has multiple looping routes to outmaneuver the A* hunter.
+        const bridgeCandidates = [];
+        for (let r = 1; r < size - 1; r++) {
+          for (let c = 1; c < size - 1; c++) {
+            if (grid[r][c] !== WALL) continue;
+            const horizOpen = grid[r][c - 1] === PATH && grid[r][c + 1] === PATH && grid[r - 1][c] === WALL && grid[r + 1][c] === WALL;
+            const vertOpen = grid[r - 1][c] === PATH && grid[r + 1][c] === PATH && grid[r][c - 1] === WALL && grid[r][c + 1] === WALL;
+            if (horizOpen || vertOpen) {
+              bridgeCandidates.push({ col: c, row: r });
+            }
+          }
+        }
+
+        shuffleArray(bridgeCandidates);
+        const bridgesToOpen = Math.floor(bridgeCandidates.length * config.braidRatio);
+        for (let i = 0; i < bridgesToOpen; i++) {
+          const b = bridgeCandidates[i];
+          grid[b.row][b.col] = PATH;
+        }
+
+        // Open extra loops out of remaining dead ends so the player rarely gets trapped
+        const cardinals = [
+          [0, -1],
+          [1, 0],
+          [0, 1],
+          [-1, 0]
+        ];
+        for (let r = 1; r < size - 1; r += 2) {
+          for (let c = 1; c < size - 1; c += 2) {
+            if (grid[r][c] !== PATH) continue;
+            let openNeighbors = 0;
+            const wallNeighbors = [];
+            for (let i = 0; i < cardinals.length; i++) {
+              const nc = c + cardinals[i][0];
+              const nr = r + cardinals[i][1];
+              if (grid[nr][nc] === PATH) {
+                openNeighbors += 1;
+              } else if (nc > 0 && nc < size - 1 && nr > 0 && nr < size - 1) {
+                const beyondC = c + cardinals[i][0] * 2;
+                const beyondR = r + cardinals[i][1] * 2;
+                if (beyondC > 0 && beyondC < size - 1 && beyondR > 0 && beyondR < size - 1 && grid[beyondR][beyondC] === PATH) {
+                  wallNeighbors.push({ col: nc, row: nr });
+                }
+              }
+            }
+            if (openNeighbors === 1 && wallNeighbors.length > 0 && Math.random() < 0.48) {
+              const pick = wallNeighbors[Math.floor(Math.random() * wallNeighbors.length)];
+              grid[pick.row][pick.col] = PATH;
+            }
+          }
+        }
+
+        // Compute shortest path distances from player start (1, 1)
+        const distFromStart = computeBfsDistances(grid, startCol, startRow);
+
+        // Pick Exit at the farthest reachable open cell from start
+        let exitCell = { col: size - 2, row: size - 2 };
+        let maxStartDist = -1;
+        for (let r = 1; r < size - 1; r++) {
+          for (let c = 1; c < size - 1; c++) {
+            if (grid[r][c] === PATH && distFromStart[r][c] > maxStartDist) {
+              maxStartDist = distFromStart[r][c];
+              exitCell = { col: c, row: r };
+            }
+          }
+        }
+
+        // Guarantee at least 2 distinct approaches to the Exit so the hunter cannot camp a single bottleneck
+        let exitOpenCount = 0;
+        const exitWallChoices = [];
+        for (let i = 0; i < cardinals.length; i++) {
+          const nc = exitCell.col + cardinals[i][0];
+          const nr = exitCell.row + cardinals[i][1];
+          if (grid[nr][nc] === PATH) {
+            exitOpenCount += 1;
+          } else if (nc > 0 && nc < size - 1 && nr > 0 && nr < size - 1) {
+            const beyondC = exitCell.col + cardinals[i][0] * 2;
+            const beyondR = exitCell.row + cardinals[i][1] * 2;
+            const connectsToPath = (beyondC > 0 && beyondC < size - 1 && beyondR > 0 && beyondR < size - 1 && grid[beyondR][beyondC] === PATH) ||
+              cardinals.some(([dx, dy]) => {
+                const ac = nc + dx;
+                const ar = nr + dy;
+                return !(ac === exitCell.col && ar === exitCell.row) && grid[ar][ac] === PATH;
+              });
+            if (connectsToPath) {
+              exitWallChoices.push({ col: nc, row: nr });
+            }
+          }
+        }
+        if (exitOpenCount < 2 && exitWallChoices.length > 0) {
+          const pick = exitWallChoices[Math.floor(Math.random() * exitWallChoices.length)];
+          grid[pick.row][pick.col] = PATH;
+        }
+
+        // Pick Hunter spawn: reachable, far from player start, and not right on top of exit
+        const distFromExit = computeBfsDistances(grid, exitCell.col, exitCell.row);
+        const minHunterDistFromPlayer = Math.floor(size * 0.75);
+        let hunterCell = null;
+        let bestScore = -1;
+
+        for (let r = 1; r < size - 1; r++) {
+          for (let c = 1; c < size - 1; c++) {
+            if (grid[r][c] !== PATH) continue;
+            if (c === startCol && r === startRow) continue;
+            if (c === exitCell.col && r === exitCell.row) continue;
+
+            const dPlayer = distFromStart[r][c];
+            const dExit = distFromExit[r][c];
+            if (dPlayer < minHunterDistFromPlayer) continue;
+
+            // Favor cells reasonably far from player and not camping directly on exit
+            const score = Math.min(dPlayer, maxStartDist * 0.85) + Math.min(dExit, 8) * 1.5;
+            if (score > bestScore) {
+              bestScore = score;
+              hunterCell = { col: c, row: r };
+            }
+          }
+        }
+
+        // Fallback if maze geometry was unusually tight
+        if (!hunterCell) {
+          hunterCell = { col: size - 2, row: 1 };
+          if (grid[hunterCell.row][hunterCell.col] === WALL) {
+            for (let r = 1; r < size - 1; r++) {
+              for (let c = size - 2; c >= 1; c--) {
+                if (grid[r][c] === PATH && !(c === exitCell.col && r === exitCell.row) && distFromStart[r][c] > 6) {
+                  hunterCell = { col: c, row: r };
+                  break;
+                }
+              }
+              if (hunterCell.col !== size - 2 || grid[hunterCell.row][hunterCell.col] === PATH) break;
+            }
+          }
+        }
+
+        return {
+          grid,
+          decor,
+          startCell: { col: startCol, row: startRow },
+          exitCell,
+          hunterCell
+        };
+      }
+
+      /* ======================================================================
+       * 5. A* PATHFINDING IMPLEMENTATION
+       * ====================================================================== */
+      function manhattan(c1, r1, c2, r2) {
+        return Math.abs(c1 - c2) + Math.abs(r1 - r2);
+      }
+
+      function findPathAStar(grid, startCol, startRow, goalCol, goalRow) {
+        const size = grid.length;
+        const total = size * size;
+        const key = (c, r) => r * size + c;
+
+        const gScore = new Float64Array(total).fill(Infinity);
+        const fScore = new Float64Array(total).fill(Infinity);
+        const cameFrom = new Int32Array(total).fill(-1);
+        const closed = new Uint8Array(total);
+        const inOpen = new Uint8Array(total);
+
+        const startKey = key(startCol, startRow);
+        const goalKey = key(goalCol, goalRow);
+
+        gScore[startKey] = 0;
+        fScore[startKey] = manhattan(startCol, startRow, goalCol, goalRow);
+
+        const openList = [startKey];
+        inOpen[startKey] = 1;
+
+        const dirs = [
+          [0, -1],
+          [1, 0],
+          [0, 1],
+          [-1, 0]
+        ];
+
+        while (openList.length > 0) {
+          // Select node in openList with lowest fScore
+          let bestIdx = 0;
+          let bestF = fScore[openList[0]];
+          for (let i = 1; i < openList.length; i++) {
+            const f = fScore[openList[i]];
+            if (f < bestF) {
+              bestF = f;
+              bestIdx = i;
+            }
+          }
+
+          const currentKey = openList[bestIdx];
+          openList[bestIdx] = openList[openList.length - 1];
+          openList.pop();
+          inOpen[currentKey] = 0;
+
+          if (currentKey === goalKey) {
+            const path = [];
+            let trace = goalKey;
+            while (trace !== -1) {
+              const tc = trace % size;
+              const tr = (trace - tc) / size;
+              path.push({ col: tc, row: tr });
+              trace = cameFrom[trace];
+            }
+            path.reverse();
+            return path;
+          }
+
+          closed[currentKey] = 1;
+          const cc = currentKey % size;
+          const cr = (currentKey - cc) / size;
+
+          for (let i = 0; i < dirs.length; i++) {
+            const nc = cc + dirs[i][0];
+            const nr = cr + dirs[i][1];
+            if (nc < 0 || nc >= size || nr < 0 || nr >= size) continue;
+            if (grid[nr][nc] === WALL) continue;
+
+            const nKey = key(nc, nr);
+            if (closed[nKey]) continue;
+
+            const tentativeG = gScore[currentKey] + 1;
+            if (tentativeG < gScore[nKey]) {
+              cameFrom[nKey] = currentKey;
+              gScore[nKey] = tentativeG;
+              fScore[nKey] = tentativeG + manhattan(nc, nr, goalCol, goalRow);
+              if (!inOpen[nKey]) {
+                openList.push(nKey);
+                inOpen[nKey] = 1;
+              }
+            }
+          }
+        }
+
+        return [{ col: startCol, row: startRow }];
+      }
+
+      /* ======================================================================
+       * 6. DRAWING HELPERS (CANVAS 2D PRIMITIVES ONLY)
+       * ====================================================================== */
+      function drawRoundedRect(x, y, w, h, r) {
+        const radius = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + w - radius, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+        ctx.lineTo(x + w, y + h - radius);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+        ctx.lineTo(x + radius, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+      }
+
+      function drawMazeBoard() {
+        const size = state.size;
+        const cs = cellSize;
+
+        // Pass 1: Sandy ground & path tiles
+        ctx.fillStyle = PALETTE.sandLight;
+        ctx.fillRect(0, 0, boardPixelSize, boardPixelSize);
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const x = c * cs;
+            const y = r * cs;
+            const seed = state.decorSeed[r][c];
+
+            if (state.grid[r][c] === PATH) {
+              if ((c + r) % 2 === 1) {
+                ctx.fillStyle = PALETTE.sandAlt;
+                ctx.fillRect(x, y, cs + 0.5, cs + 0.5);
+              }
+
+              // Subtle deterministic pebbles / sandy texture
+              if (seed < 0.24) {
+                ctx.fillStyle = PALETTE.pebble;
+                ctx.beginPath();
+                ctx.arc(x + cs * (0.25 + seed * 1.5), y + cs * (0.3 + seed * 1.1), Math.max(1.2, cs * 0.055), 0, Math.PI * 2);
+                ctx.fill();
+              } else if (seed > 0.86) {
+                ctx.fillStyle = PALETTE.sandTrack;
+                ctx.beginPath();
+                ctx.ellipse(x + cs * 0.65, y + cs * 0.7, cs * 0.1, cs * 0.06, 0.4, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          }
+        }
+
+        // Start marker pad
+        {
+          const sx = state.startCell.col * cs;
+          const sy = state.startCell.row * cs;
+          ctx.fillStyle = PALETTE.startPad;
+          drawRoundedRect(sx + cs * 0.16, sy + cs * 0.16, cs * 0.68, cs * 0.68, cs * 0.16);
+          ctx.fill();
+          ctx.strokeStyle = "#8a7c50";
+          ctx.lineWidth = Math.max(1, cs * 0.04);
+          ctx.stroke();
+        }
+
+        // Subtle danger footsteps on the hunter's current A* next-step preview
+        if (state.hunter.path && state.hunter.path.length > 1) {
+          const nextStep = state.hunter.path[1];
+          if (!(nextStep.col === state.player.col && nextStep.row === state.player.row)) {
+            const nx = nextStep.col * cs + cs * 0.5;
+            const ny = nextStep.row * cs + cs * 0.5;
+            ctx.fillStyle = "rgba(58, 163, 65, 0.16)";
+            ctx.beginPath();
+            ctx.arc(nx, ny, cs * 0.13, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Pass 2: Hedge walls, bushes, and mini trees
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (state.grid[r][c] !== WALL) continue;
+
+            const x = c * cs;
+            const y = r * cs;
+            const seed = state.decorSeed[r][c];
+
+            // Wall base shadow & grass block
+            ctx.fillStyle = PALETTE.grassShadow;
+            ctx.fillRect(x, y, cs + 0.5, cs + 0.5);
+
+            ctx.fillStyle = PALETTE.grassBase;
+            drawRoundedRect(x + cs * 0.03, y + cs * 0.03, cs * 0.94, cs * 0.88, cs * 0.14);
+            ctx.fill();
+
+            // Lighter leafy top face
+            ctx.fillStyle = PALETTE.grassTop;
+            drawRoundedRect(x + cs * 0.08, y + cs * 0.06, cs * 0.84, cs * 0.72, cs * 0.14);
+            ctx.fill();
+
+            // Varied tree / bush / blossom accents on walls
+            if (seed < 0.28) {
+              // Cartoon round forest tree
+              const tx = x + cs * 0.5;
+              const ty = y + cs * 0.44;
+              ctx.fillStyle = PALETTE.treeTrunk;
+              ctx.fillRect(tx - cs * 0.08, ty + cs * 0.1, cs * 0.16, cs * 0.28);
+
+              ctx.fillStyle = PALETTE.bushDark;
+              ctx.beginPath();
+              ctx.arc(tx, ty + cs * 0.04, cs * 0.29, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = PALETTE.bushMid;
+              ctx.beginPath();
+              ctx.arc(tx, ty - cs * 0.02, cs * 0.24, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = PALETTE.bushHighlight;
+              ctx.beginPath();
+              ctx.arc(tx - cs * 0.07, ty - cs * 0.08, cs * 0.11, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (seed < 0.56) {
+              // Clustered hedge bush
+              const bx = x + cs * 0.5;
+              const by = y + cs * 0.45;
+              ctx.fillStyle = PALETTE.bushDark;
+              ctx.beginPath();
+              ctx.arc(bx - cs * 0.14, by + cs * 0.04, cs * 0.17, 0, Math.PI * 2);
+              ctx.arc(bx + cs * 0.14, by + cs * 0.04, cs * 0.17, 0, Math.PI * 2);
+              ctx.arc(bx, by - cs * 0.08, cs * 0.19, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = PALETTE.bushHighlight;
+              ctx.beginPath();
+              ctx.arc(bx - cs * 0.04, by - cs * 0.1, cs * 0.1, 0, Math.PI * 2);
+              ctx.fill();
+
+              if (seed < 0.38) {
+                ctx.fillStyle = PALETTE.flowerBerry;
+                ctx.beginPath();
+                ctx.arc(bx + cs * 0.1, by, Math.max(1.4, cs * 0.055), 0, Math.PI * 2);
+                ctx.arc(bx - cs * 0.12, by + cs * 0.03, Math.max(1.4, cs * 0.055), 0, Math.PI * 2);
+                ctx.fill();
+              } else if (seed > 0.48) {
+                ctx.fillStyle = PALETTE.flowerGold;
+                ctx.beginPath();
+                ctx.arc(bx + cs * 0.08, by - cs * 0.05, Math.max(1.4, cs * 0.055), 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          }
+        }
+
+        // Exit golden portal / forest clearing (drawn after walls so larger Maze 2 & 3 icon stays crisp)
+        {
+          const iconScale = MAZE_CONFIGS[state.mazeIndex].entityScale;
+          const ex = state.exitCell.col * cs + cs / 2;
+          const ey = state.exitCell.row * cs + cs / 2;
+          const pulse = 0.88 + 0.12 * Math.sin(state.pulseClock * 4.2);
+
+          ctx.save();
+          ctx.translate(ex, ey);
+          ctx.scale(iconScale, iconScale);
+
+          // Outer glow ring
+          ctx.fillStyle = "rgba(252, 211, 77, 0.38)";
+          ctx.beginPath();
+          ctx.arc(0, 0, cs * 0.44 * pulse, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Golden archway / pad
+          ctx.fillStyle = PALETTE.exitCore;
+          ctx.beginPath();
+          ctx.arc(0, 0, cs * 0.31, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = PALETTE.exitGlow;
+          ctx.beginPath();
+          ctx.arc(0, 0, cs * 0.21, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Crisp EXIT label
+          ctx.fillStyle = "#78350f";
+          ctx.font = `800 ${Math.max(8, Math.floor(cs * 0.24))}px "Trebuchet MS", sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("EXIT", 0, 0.5);
+          ctx.restore();
+        }
+      }
+
+      function drawPlayerExplorer() {
+        const p = state.player;
+        const cs = cellSize;
+        const iconScale = MAZE_CONFIGS[state.mazeIndex].entityScale;
+        const cx = (p.visCol + 0.5) * cs;
+        const cy = (p.visRow + 0.5) * cs;
+
+        // Subtle stride bob while animating between cells
+        const isMoving = p.animTime < MOVE_ANIM_DURATION;
+        const bob = isMoving ? Math.sin((p.animTime / MOVE_ANIM_DURATION) * Math.PI) * cs * 0.06 : 0;
+        const py = cy - bob;
+
+        ctx.save();
+        ctx.translate(cx, py);
+        ctx.scale(iconScale, iconScale);
+
+        // Ground shadow
+        ctx.fillStyle = "rgba(27, 43, 29, 0.25)";
+        ctx.beginPath();
+        ctx.ellipse(0, cs * 0.36 + bob * 0.5, cs * 0.27, cs * 0.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Legs & shoes
+        const stride = isMoving ? Math.sin((p.animTime / MOVE_ANIM_DURATION) * Math.PI) * cs * 0.08 * (p.stepParity ? 1 : -1) : 0;
+        ctx.fillStyle = PALETTE.skinPeach;
+        ctx.fillRect(-cs * 0.13, cs * 0.21, cs * 0.09, cs * 0.11 + stride * 0.3);
+        ctx.fillRect(cs * 0.04, cs * 0.21, cs * 0.09, cs * 0.11 - stride * 0.3);
+
+        ctx.fillStyle = PALETTE.shoeBrown;
+        drawRoundedRect(-cs * 0.15, cs * 0.3 + stride * 0.3, cs * 0.12, cs * 0.07, cs * 0.03);
+        ctx.fill();
+        drawRoundedRect(cs * 0.03, cs * 0.3 - stride * 0.3, cs * 0.12, cs * 0.07, cs * 0.03);
+        ctx.fill();
+
+        // Dark blue shorts
+        ctx.fillStyle = PALETTE.shortsNavy;
+        drawRoundedRect(-cs * 0.18, cs * 0.12, cs * 0.36, cs * 0.13, cs * 0.04);
+        ctx.fill();
+        ctx.fillRect(-cs * 0.17, cs * 0.18, cs * 0.14, cs * 0.08);
+        ctx.fillRect(cs * 0.03, cs * 0.18, cs * 0.14, cs * 0.08);
+
+        // Striped blue-and-white long-sleeve top (torso + arms)
+        // Left & right sleeves
+        ctx.save();
+        ctx.beginPath();
+        drawRoundedRect(-cs * 0.28, -cs * 0.07, cs * 0.56, cs * 0.18, cs * 0.07);
+        ctx.clip();
+
+        ctx.fillStyle = PALETTE.shirtWhite;
+        ctx.fillRect(-cs * 0.3, -cs * 0.1, cs * 0.6, cs * 0.26);
+
+        ctx.fillStyle = PALETTE.shirtBlue;
+        ctx.fillRect(-cs * 0.3, -cs * 0.07, cs * 0.6, cs * 0.045);
+        ctx.fillRect(-cs * 0.3, cs * 0.015, cs * 0.6, cs * 0.045);
+        ctx.fillRect(-cs * 0.3, cs * 0.09, cs * 0.6, cs * 0.04);
+        ctx.restore();
+
+        // Torso outline
+        ctx.strokeStyle = "#1d3560";
+        ctx.lineWidth = Math.max(1, cs * 0.03);
+        drawRoundedRect(-cs * 0.2, -cs * 0.08, cs * 0.4, cs * 0.22, cs * 0.06);
+        ctx.stroke();
+
+        // Little hands at sleeve ends
+        ctx.fillStyle = PALETTE.skinPeach;
+        ctx.beginPath();
+        ctx.arc(-cs * 0.27, cs * 0.06, cs * 0.055, 0, Math.PI * 2);
+        ctx.arc(cs * 0.27, cs * 0.06, cs * 0.055, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Back layer of orange/red bob hair
+        ctx.fillStyle = PALETTE.hairOrange;
+        ctx.beginPath();
+        ctx.arc(0, -cs * 0.2, cs * 0.24, Math.PI * 0.85, Math.PI * 2.15);
+        ctx.lineTo(cs * 0.25, -cs * 0.06);
+        ctx.quadraticCurveTo(0, -cs * 0.01, -cs * 0.25, -cs * 0.06);
+        ctx.closePath();
+        ctx.fill();
+
+        // Face circle
+        ctx.fillStyle = PALETTE.skinPeach;
+        ctx.beginPath();
+        ctx.arc(0, -cs * 0.18, cs * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rosy cheeks
+        ctx.fillStyle = PALETTE.cheekPink;
+        ctx.beginPath();
+        ctx.arc(-cs * 0.1, -cs * 0.14, cs * 0.035, 0, Math.PI * 2);
+        ctx.arc(cs * 0.1, -cs * 0.14, cs * 0.035, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Expressive eyes looking slightly toward facing direction
+        const lookX = p.facingDc * cs * 0.022;
+        const lookY = p.facingDr * cs * 0.015;
+        ctx.fillStyle = "#1f2937";
+        ctx.beginPath();
+        ctx.arc(-cs * 0.065 + lookX, -cs * 0.18 + lookY, Math.max(1.3, cs * 0.028), 0, Math.PI * 2);
+        ctx.arc(cs * 0.065 + lookX, -cs * 0.18 + lookY, Math.max(1.3, cs * 0.028), 0, Math.PI * 2);
+        ctx.fill();
+
+        // Smile
+        ctx.strokeStyle = "#8a4236";
+        ctx.lineWidth = Math.max(1, cs * 0.025);
+        ctx.beginPath();
+        ctx.arc(lookX * 0.5, -cs * 0.14, cs * 0.055, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+
+        // Front orange/red bob bangs & side framing locks
+        ctx.fillStyle = PALETTE.hairOrange;
+        ctx.beginPath();
+        ctx.arc(0, -cs * 0.21, cs * 0.21, Math.PI * 0.95, Math.PI * 2.05);
+        ctx.quadraticCurveTo(cs * 0.1, -cs * 0.22, 0, -cs * 0.26);
+        ctx.quadraticCurveTo(-cs * 0.1, -cs * 0.22, -cs * 0.21, -cs * 0.19);
+        ctx.closePath();
+        ctx.fill();
+
+        // Side bob curves
+        ctx.beginPath();
+        ctx.ellipse(-cs * 0.18, -cs * 0.14, cs * 0.06, cs * 0.11, 0.15, 0, Math.PI * 2);
+        ctx.ellipse(cs * 0.18, -cs * 0.14, cs * 0.06, cs * 0.11, -0.15, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hair highlight arc
+        ctx.strokeStyle = PALETTE.hairHighlight;
+        ctx.lineWidth = Math.max(1.2, cs * 0.032);
+        ctx.beginPath();
+        ctx.arc(0, -cs * 0.22, cs * 0.15, Math.PI * 1.15, Math.PI * 1.65);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      function drawMonsterHunter() {
+        const h = state.hunter;
+        const p = state.player;
+        const cs = cellSize;
+        const iconScale = MAZE_CONFIGS[state.mazeIndex].entityScale;
+        const cx = (h.visCol + 0.5) * cs;
+        const cy = (h.visRow + 0.5) * cs;
+
+        const isMoving = h.animTime < MOVE_ANIM_DURATION;
+        const stomp = isMoving ? Math.sin((h.animTime / MOVE_ANIM_DURATION) * Math.PI) * cs * 0.07 : 0;
+        const idleBreath = Math.sin(state.pulseClock * 4.5) * cs * 0.018;
+        const hy = cy - stomp;
+
+        // Direction vector toward player for tracking pupils
+        const dx = p.visCol - h.visCol;
+        const dy = p.visRow - h.visRow;
+        const dist = Math.hypot(dx, dy) || 1;
+        const eyeShiftX = (dx / dist) * cs * 0.028;
+        const eyeShiftY = (dy / dist) * cs * 0.028;
+
+        ctx.save();
+        ctx.translate(cx, hy);
+        ctx.scale(iconScale, iconScale);
+
+        // Ground shadow
+        ctx.fillStyle = "rgba(27, 43, 29, 0.32)";
+        ctx.beginPath();
+        ctx.ellipse(0, cs * 0.38 + stomp * 0.5, cs * 0.36, cs * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Speed state subtle ring around monster
+        if (state.speedModifierType === "slow") {
+          ctx.strokeStyle = "rgba(96, 165, 250, 0.75)";
+          ctx.lineWidth = Math.max(1.5, cs * 0.06);
+          ctx.beginPath();
+          ctx.arc(0, cs * 0.04, cs * 0.44, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (state.speedModifierType === "fast") {
+          ctx.strokeStyle = "rgba(239, 68, 68, 0.85)";
+          ctx.lineWidth = Math.max(1.5, cs * 0.06);
+          ctx.beginPath();
+          ctx.arc(0, cs * 0.04, cs * 0.44, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Stubby monster feet
+        ctx.fillStyle = PALETTE.monsterDark;
+        drawRoundedRect(-cs * 0.25, cs * 0.27, cs * 0.17, cs * 0.11, cs * 0.05);
+        ctx.fill();
+        drawRoundedRect(cs * 0.08, cs * 0.27, cs * 0.17, cs * 0.11, cs * 0.05);
+        ctx.fill();
+
+        // Curved horn stalks for the two smaller eyes
+        ctx.strokeStyle = PALETTE.monsterDark;
+        ctx.lineWidth = Math.max(2, cs * 0.075);
+        ctx.lineCap = "round";
+
+        // Left horn stalk
+        ctx.beginPath();
+        ctx.moveTo(-cs * 0.16, -cs * 0.18);
+        ctx.quadraticCurveTo(-cs * 0.33, -cs * 0.3, -cs * 0.28, -cs * 0.41);
+        ctx.stroke();
+
+        // Right horn stalk
+        ctx.beginPath();
+        ctx.moveTo(cs * 0.16, -cs * 0.18);
+        ctx.quadraticCurveTo(cs * 0.33, -cs * 0.3, cs * 0.28, -cs * 0.41);
+        ctx.stroke();
+
+        // Chunky green monster body
+        ctx.fillStyle = PALETTE.monsterGreen;
+        ctx.strokeStyle = PALETTE.monsterDark;
+        ctx.lineWidth = Math.max(1.5, cs * 0.045);
+        ctx.beginPath();
+        ctx.ellipse(0, cs * 0.04, cs * 0.36 + idleBreath, cs * 0.31 - idleBreath * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Stubby side arms
+        ctx.fillStyle = PALETTE.monsterGreen;
+        ctx.beginPath();
+        ctx.ellipse(-cs * 0.36, cs * 0.05, cs * 0.09, cs * 0.07, -0.4, 0, Math.PI * 2);
+        ctx.ellipse(cs * 0.36, cs * 0.05, cs * 0.09, cs * 0.07, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Two smaller eyes on top of curved horns
+        const hornEyes = [
+          { x: -cs * 0.28, y: -cs * 0.41 },
+          { x: cs * 0.28, y: -cs * 0.41 }
+        ];
+        for (let i = 0; i < hornEyes.length; i++) {
+          const he = hornEyes[i];
+          ctx.fillStyle = PALETTE.monsterGreen;
+          ctx.beginPath();
+          ctx.arc(he.x, he.y, cs * 0.095, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(he.x, he.y, cs * 0.072, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#111827";
+          ctx.beginPath();
+          ctx.arc(he.x + eyeShiftX * 0.65, he.y + eyeShiftY * 0.65, Math.max(1.2, cs * 0.035), 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // One large central eye
+        const bigEyeY = -cs * 0.13;
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = PALETTE.monsterDark;
+        ctx.lineWidth = Math.max(1.2, cs * 0.035);
+        ctx.beginPath();
+        ctx.arc(0, bigEyeY, cs * 0.125, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Amber/gold iris + dark pupil tracking player
+        ctx.fillStyle = PALETTE.monsterEyeRing;
+        ctx.beginPath();
+        ctx.arc(eyeShiftX, bigEyeY + eyeShiftY, cs * 0.068, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#111827";
+        ctx.beginPath();
+        ctx.arc(eyeShiftX * 1.1, bigEyeY + eyeShiftY * 1.1, Math.max(1.5, cs * 0.038), 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eye shine
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(eyeShiftX - cs * 0.025, bigEyeY + eyeShiftY - cs * 0.025, Math.max(1, cs * 0.018), 0, Math.PI * 2);
+        ctx.fill();
+
+        // Wide open mouth with big teeth
+        const mouthY = cs * 0.14;
+        const mouthW = cs * 0.25;
+        const mouthH = cs * 0.125;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(0, mouthY, mouthW, mouthH, 0, 0, Math.PI * 2);
+        ctx.fillStyle = PALETTE.monsterMouth;
+        ctx.fill();
+        ctx.clip();
+
+        // Tongue inside mouth
+        ctx.fillStyle = PALETTE.monsterTongue;
+        ctx.beginPath();
+        ctx.ellipse(0, mouthY + mouthH * 0.65, mouthW * 0.55, mouthH * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Top jagged teeth
+        ctx.fillStyle = PALETTE.monsterTooth;
+        const topToothPositions = [-0.17, -0.06, 0.06, 0.17];
+        for (let i = 0; i < topToothPositions.length; i++) {
+          const tx = topToothPositions[i] * cs;
+          ctx.beginPath();
+          ctx.moveTo(tx - cs * 0.04, mouthY - mouthH);
+          ctx.lineTo(tx + cs * 0.04, mouthY - mouthH);
+          ctx.lineTo(tx, mouthY - mouthH * 0.18);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Bottom big teeth
+        const botToothPositions = [-0.12, 0, 0.12];
+        for (let i = 0; i < botToothPositions.length; i++) {
+          const bx = botToothPositions[i] * cs;
+          ctx.beginPath();
+          ctx.moveTo(bx - cs * 0.045, mouthY + mouthH);
+          ctx.lineTo(bx + cs * 0.045, mouthY + mouthH);
+          ctx.lineTo(bx, mouthY + mouthH * 0.12);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // Mouth outline
+        ctx.strokeStyle = PALETTE.monsterDark;
+        ctx.lineWidth = Math.max(1.2, cs * 0.032);
+        ctx.beginPath();
+        ctx.ellipse(0, mouthY, mouthW, mouthH, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      function renderScene() {
+        drawMazeBoard();
+        // Draw hunter and player in clean z-order based on vertical position
+        if (state.hunter.visRow <= state.player.visRow) {
+          drawMonsterHunter();
+          drawPlayerExplorer();
+        } else {
+          drawPlayerExplorer();
+          drawMonsterHunter();
+        }
+
+        // Visual caught flash ring when losing a life in Mode B
+        if (state.caughtFlashTimer > 0) {
+          const px = (state.player.visCol + 0.5) * cellSize;
+          const py = (state.player.visRow + 0.5) * cellSize;
+          const alpha = Math.min(0.65, state.caughtFlashTimer * 0.8);
+          ctx.save();
+          ctx.fillStyle = `rgba(220, 38, 38, ${alpha * 0.25})`;
+          ctx.fillRect(0, 0, boardPixelSize, boardPixelSize);
+          ctx.strokeStyle = `rgba(239, 68, 68, ${alpha})`;
+          ctx.lineWidth = Math.max(3, cellSize * 0.14);
+          ctx.beginPath();
+          ctx.arc(px, py, cellSize * 0.72, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      /* ======================================================================
+       * 7. QUIZ LOGIC & HUD FORMATTING
+       * ====================================================================== */
+      function formatTime(totalSeconds) {
+        const whole = Math.floor(totalSeconds);
+        const mins = Math.floor(whole / 60);
+        const secs = whole % 60;
+        return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      }
+
+      function getEffectiveTier() {
+        let tier = state.hunterTier;
+        if (state.speedModifierTimeLeft > 0) {
+          if (state.speedModifierType === "slow") {
+            tier = Math.max(0, tier - 1);
+          } else if (state.speedModifierType === "fast") {
+            tier = Math.min(SPEED_LADDER.length - 1, tier + 1);
+          }
+        }
+        return tier;
+      }
+
+      function getEffectiveStepSec() {
+        return 1 / SPEED_LADDER[getEffectiveTier()];
+      }
+
+      function formatSpeedFromTier(tier) {
+        return `${SPEED_LADDER[tier].toFixed(1)} cells/s`;
+      }
+
+      function renderHudLives() {
+        const inActiveRun = state.mode !== "start";
+        btnHudSwitchMode.hidden = !inActiveRun;
+        btnHudSwitchMode.textContent = state.catchMode === "instant" ? "Switch to 3 Lives" : "Switch to Instant KO";
+        btnOverSwitchMode.textContent = state.catchMode === "instant" ? "Play 3 Lives Mode" : "Play Instant Mode";
+        btnWinSwitchMode.textContent = state.catchMode === "instant" ? "Play 3 Lives Mode" : "Play Instant Mode";
+
+        if (state.catchMode === "lives") {
+          hudLivesSep.hidden = false;
+          hudLivesItem.hidden = false;
+          let html = "";
+          for (let i = 0; i < MAX_LIVES; i++) {
+            html += i < state.lives
+              ? '<span class="heart-full" aria-hidden="true">♥</span>'
+              : '<span class="heart-empty" aria-hidden="true">♡</span>';
+          }
+          hudHearts.innerHTML = html;
+          hudHearts.setAttribute("aria-label", `${state.lives} of ${MAX_LIVES} lives remaining`);
+        } else {
+          hudLivesSep.hidden = true;
+          hudLivesItem.hidden = true;
+        }
+      }
+
+      function updateHud() {
+        hudMaze.textContent = `${state.mazeIndex + 1} / ${MAZE_CONFIGS.length}`;
+        hudMoves.textContent = String(state.totalMoves);
+
+        const tier = getEffectiveTier();
+        let speedText = formatSpeedFromTier(tier);
+        hudSpeed.className = "hud-value";
+        if (state.speedModifierTimeLeft > 0) {
+          const secsLeft = Math.ceil(state.speedModifierTimeLeft);
+          if (state.speedModifierType === "slow") {
+            speedText += ` (Slowed ${secsLeft}s)`;
+            hudSpeed.classList.add("is-slow");
+          } else if (state.speedModifierType === "fast") {
+            speedText += ` (Fast ${secsLeft}s)`;
+            hudSpeed.classList.add("is-fast");
+          }
+        }
+        hudSpeed.textContent = speedText;
+
+        hudQuiz.textContent = `${state.correctAnswers} correct / ${state.wrongAnswers} wrong`;
+        hudTime.textContent = formatTime(state.elapsedSeconds);
+        renderHudLives();
+      }
+
+      function showToast(message, type) {
+        if (toastTimeoutId !== null) {
+          clearTimeout(toastTimeoutId);
+        }
+        statusToast.textContent = message;
+        statusToast.className = `toast ${type} visible`;
+        toastTimeoutId = setTimeout(() => {
+          statusToast.classList.remove("visible");
+        }, 2800);
+      }
+
+      function hideAllOverlays() {
+        overlayStart.hidden = true;
+        overlayQuiz.hidden = true;
+        overlayRapidWarning.hidden = true;
+        overlayRapidQuiz.hidden = true;
+        overlayRapidResults.hidden = true;
+        overlayCleared.hidden = true;
+        overlayGameOver.hidden = true;
+        overlayWin.hidden = true;
+      }
+
+      function buildFreshQuestionDeck() {
+        state.questionDeck = shuffleArray(QUESTION_BANK.slice());
+      }
+
+      function drawNextQuestion() {
+        if (state.questionDeck.length === 0) {
+          buildFreshQuestionDeck();
+        }
+        const qObj = state.questionDeck.pop();
+        const choices = shuffleArray([
+          { text: qObj.correct, isCorrect: true },
+          { text: qObj.wrong[0], isCorrect: false },
+          { text: qObj.wrong[1], isCorrect: false }
+        ]);
+        return { qObj, choices };
+      }
+
+      function openQuizOverlay() {
+        state.mode = "quiz";
+        state.queuedDirection = null;
+        state.quizLocked = false;
+
+        const nextQ = drawNextQuestion();
+        state.activeQuiz = nextQ;
+
+        quizMeta.textContent = `${nextQ.qObj.category} · Move ${state.totalMoves}`;
+        quizQuestion.textContent = nextQ.qObj.q;
+        quizFeedback.hidden = true;
+        quizFeedback.textContent = "";
+        quizFeedback.className = "quiz-feedback";
+        quizActions.hidden = true;
+
+        quizOptions.innerHTML = "";
+        nextQ.choices.forEach((choice, idx) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "quiz-option";
+          btn.dataset.index = String(idx);
+
+          const keyBadge = document.createElement("span");
+          keyBadge.className = "quiz-option-key";
+          keyBadge.textContent = String(idx + 1);
+
+          const labelSpan = document.createElement("span");
+          labelSpan.textContent = choice.text;
+
+          btn.appendChild(keyBadge);
+          btn.appendChild(labelSpan);
+          btn.addEventListener("click", () => handleQuizAnswer(idx));
+          quizOptions.appendChild(btn);
+        });
+
+        hideAllOverlays();
+        overlayQuiz.hidden = false;
+      }
+
+      function handleQuizAnswer(chosenIndex) {
+        if (state.mode !== "quiz" || state.quizLocked || !state.activeQuiz) return;
+        state.quizLocked = true;
+
+        const { qObj, choices } = state.activeQuiz;
+        const buttons = quizOptions.querySelectorAll(".quiz-option");
+
+        buttons.forEach((btn, idx) => {
+          btn.disabled = true;
+          if (choices[idx].isCorrect) {
+            btn.classList.add("is-correct");
+          } else if (idx === chosenIndex) {
+            btn.classList.add("is-wrong");
+          }
+        });
+
+        const picked = choices[chosenIndex];
+        if (picked.isCorrect) {
+          state.correctAnswers += 1;
+          state.speedModifierType = "slow";
+          state.speedModifierTimeLeft = MODIFIER_DURATION_SEC;
+          quizFeedback.textContent = `Correct! Hunter slowed down for ${MODIFIER_DURATION_SEC} seconds.`;
+          quizFeedback.className = "quiz-feedback correct";
+          state.activeQuiz.outcomeMsg = `Correct! Hunter slowed for ${MODIFIER_DURATION_SEC}s.`;
+          state.activeQuiz.outcomeType = "correct";
+        } else {
+          state.wrongAnswers += 1;
+          state.speedModifierType = "fast";
+          state.speedModifierTimeLeft = MODIFIER_DURATION_SEC;
+          quizFeedback.textContent = `Wrong! Answer: ${qObj.correct}. Hunter sped up for ${MODIFIER_DURATION_SEC} seconds!`;
+          quizFeedback.className = "quiz-feedback wrong";
+          state.activeQuiz.outcomeMsg = `Wrong! Hunter sped up for ${MODIFIER_DURATION_SEC}s!`;
+          state.activeQuiz.outcomeType = "wrong";
+        }
+
+        updateHud();
+        quizFeedback.hidden = false;
+        quizActions.hidden = false;
+        document.getElementById("btnQuizContinue").focus();
+      }
+
+      function resumeFromQuiz() {
+        if (state.mode !== "quiz" || !state.quizLocked) return;
+        const msg = state.activeQuiz ? state.activeQuiz.outcomeMsg : "";
+        const type = state.activeQuiz ? state.activeQuiz.outcomeType : "correct";
+        state.activeQuiz = null;
+        hideAllOverlays();
+        state.mode = "playing";
+        if (msg) showToast(msg, type);
+      }
+
+      /* --- Rapid Fire Round Logic --- */
+      function getRapidFireSecondsPerQuestion() {
+        return MAZE_CONFIGS[state.mazeIndex].rapidSecPerQ;
+      }
+
+      function openRapidFireWarning() {
+        state.mode = "rapid_warning";
+        state.queuedDirection = null;
+        state.rapidFireDoneThisMaze = true;
+        document.getElementById("rapidWarnTime").textContent = `${getRapidFireSecondsPerQuestion()} seconds`;
+        hideAllOverlays();
+        overlayRapidWarning.hidden = false;
+        document.getElementById("btnRapidStart").focus();
+      }
+
+      function beginRapidFireRound() {
+        state.rapidQuestions = [];
+        for (let i = 0; i < RAPID_FIRE_COUNT; i++) {
+          state.rapidQuestions.push(drawNextQuestion());
+        }
+        state.rapidIndex = 0;
+        state.rapidScore = 0;
+        state.mode = "rapid_quiz";
+        hideAllOverlays();
+        overlayRapidQuiz.hidden = false;
+        showRapidQuestion();
+      }
+
+      function updateRapidTimerUI() {
+        const totalSec = getRapidFireSecondsPerQuestion();
+        const ratio = Math.max(0, Math.min(1, state.rapidTimeLeft / totalSec));
+        rapidTimerBar.style.transform = `scaleX(${ratio})`;
+        rapidTimerBar.classList.toggle("is-urgent", state.rapidTimeLeft <= 2.5);
+        rapidTimeLabel.textContent = `${Math.max(0, state.rapidTimeLeft).toFixed(1)}s`;
+      }
+
+      function showRapidQuestion() {
+        const entry = state.rapidQuestions[state.rapidIndex];
+        state.rapidQuestionLocked = false;
+        state.rapidTimeLeft = getRapidFireSecondsPerQuestion();
+
+        rapidProgressBanner.textContent = `RAPID FIRE — Question ${state.rapidIndex + 1} of ${RAPID_FIRE_COUNT}`;
+        rapidCategory.textContent = entry.qObj.category;
+        rapidQuestion.textContent = entry.qObj.q;
+        rapidFeedback.hidden = true;
+        rapidFeedback.textContent = "";
+        rapidFeedback.className = "quiz-feedback";
+        updateRapidTimerUI();
+
+        rapidOptions.innerHTML = "";
+        entry.choices.forEach((choice, idx) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "quiz-option";
+          btn.dataset.index = String(idx);
+
+          const keyBadge = document.createElement("span");
+          keyBadge.className = "quiz-option-key";
+          keyBadge.textContent = String(idx + 1);
+
+          const labelSpan = document.createElement("span");
+          labelSpan.textContent = choice.text;
+
+          btn.appendChild(keyBadge);
+          btn.appendChild(labelSpan);
+          btn.addEventListener("click", () => handleRapidAnswer(idx));
+          rapidOptions.appendChild(btn);
+        });
+      }
+
+      function handleRapidAnswer(chosenIndex) {
+        if (state.mode !== "rapid_quiz" || state.rapidQuestionLocked) return;
+        state.rapidQuestionLocked = true;
+
+        const entry = state.rapidQuestions[state.rapidIndex];
+        const buttons = rapidOptions.querySelectorAll(".quiz-option");
+
+        buttons.forEach((btn, idx) => {
+          btn.disabled = true;
+          if (entry.choices[idx].isCorrect) {
+            btn.classList.add("is-correct");
+          } else if (idx === chosenIndex) {
+            btn.classList.add("is-wrong");
+          }
+        });
+
+        const timedOut = chosenIndex === -1;
+        const pickedCorrect = !timedOut && entry.choices[chosenIndex].isCorrect;
+
+        if (pickedCorrect) {
+          state.rapidScore += 1;
+          state.correctAnswers += 1;
+          rapidFeedback.textContent = "Correct! (+1)";
+          rapidFeedback.className = "quiz-feedback correct";
+        } else if (timedOut) {
+          state.wrongAnswers += 1;
+          rapidFeedback.textContent = `Time's up! Answer: ${entry.qObj.correct}`;
+          rapidFeedback.className = "quiz-feedback wrong";
+        } else {
+          state.wrongAnswers += 1;
+          rapidFeedback.textContent = `Wrong! Answer: ${entry.qObj.correct}`;
+          rapidFeedback.className = "quiz-feedback wrong";
+        }
+        rapidFeedback.hidden = false;
+        updateHud();
+
+        setTimeout(() => {
+          if (state.mode !== "rapid_quiz") return;
+          state.rapidIndex += 1;
+          if (state.rapidIndex < RAPID_FIRE_COUNT) {
+            showRapidQuestion();
+          } else {
+            finishRapidFireRound();
+          }
+        }, 480);
+      }
+
+      function finishRapidFireRound() {
+        state.mode = "rapid_results";
+
+        // Permanent speed ladder bump scaled by score: 0-1 -> +1, 2-3 -> +2, 4-5 -> +3
+        let tierGain = 1;
+        if (state.rapidScore >= 4) {
+          tierGain = 3;
+        } else if (state.rapidScore >= 2) {
+          tierGain = 2;
+        }
+
+        state.hunterTier = Math.min(SPEED_LADDER.length - 1, state.hunterTier + tierGain);
+        state.speedModifierType = "none";
+        state.speedModifierTimeLeft = 0;
+        updateHud();
+
+        const newSpeed = formatSpeedFromTier(state.hunterTier);
+        const intensityWord = tierGain === 3 ? "much faster" : "faster";
+        document.getElementById("rapidResultsTitle").textContent = `Score: ${state.rapidScore} / ${RAPID_FIRE_COUNT}`;
+        document.getElementById("rapidResultsMsg").textContent =
+          `${state.rapidScore}/${RAPID_FIRE_COUNT} correct — the hunter is now ${intensityWord} (${newSpeed}).`;
+
+        hideAllOverlays();
+        overlayRapidResults.hidden = false;
+        document.getElementById("btnRapidResume").focus();
+      }
+
+      function resumeFromRapidFire() {
+        if (state.mode !== "rapid_results") return;
+        hideAllOverlays();
+        state.mode = "playing";
+        showToast(`Hunter speed now ${formatSpeedFromTier(state.hunterTier)}!`, "wrong");
+      }
+
+      /* ======================================================================
+       * 8. LEVEL SETUP, TRANSITIONS & INPUT HANDLING
+       * ====================================================================== */
+      function loadMaze(index) {
+        state.mazeIndex = index;
+        const cfg = MAZE_CONFIGS[index];
+        state.size = cfg.size;
+
+        // Keep any permanent speed increases earned from earlier Rapid Fire rounds
+        state.hunterTier = index === 0
+          ? cfg.baseTier
+          : Math.min(SPEED_LADDER.length - 1, Math.max(cfg.baseTier, state.hunterTier));
+
+        const generated = generateMaze(cfg);
+        state.grid = generated.grid;
+        state.decorSeed = generated.decor;
+        state.startCell = generated.startCell;
+        state.exitCell = generated.exitCell;
+        state.hunterSpawnCell = { col: generated.hunterCell.col, row: generated.hunterCell.row };
+
+        state.player.col = generated.startCell.col;
+        state.player.row = generated.startCell.row;
+        state.player.fromCol = generated.startCell.col;
+        state.player.fromRow = generated.startCell.row;
+        state.player.visCol = generated.startCell.col;
+        state.player.visRow = generated.startCell.row;
+        state.player.animTime = MOVE_ANIM_DURATION;
+        state.player.facingDc = 0;
+        state.player.facingDr = 1;
+
+        state.hunter.col = generated.hunterCell.col;
+        state.hunter.row = generated.hunterCell.row;
+        state.hunter.fromCol = generated.hunterCell.col;
+        state.hunter.fromRow = generated.hunterCell.row;
+        state.hunter.visCol = generated.hunterCell.col;
+        state.hunter.visRow = generated.hunterCell.row;
+        state.hunter.animTime = MOVE_ANIM_DURATION;
+
+        state.hunter.path = findPathAStar(
+          state.grid,
+          state.hunter.col,
+          state.hunter.row,
+          state.player.col,
+          state.player.row
+        );
+
+        state.mazeMoves = 0;
+        state.movesSinceQuiz = 0;
+        state.rapidFireDoneThisMaze = false;
+        state.hunterStepTimer = 0;
+        state.caughtFlashTimer = 0;
+        state.queuedDirection = null;
+        state.speedModifierType = "none";
+        state.speedModifierTimeLeft = 0;
+
+        resizeCanvas();
+        updateHud();
+      }
+
+      function startNewRun() {
+        state.totalMoves = 0;
+        state.correctAnswers = 0;
+        state.wrongAnswers = 0;
+        state.elapsedSeconds = 0;
+        state.lives = MAX_LIVES;
+        state.hunterTier = MAZE_CONFIGS[0].baseTier;
+        state.mode = "playing";
+        buildFreshQuestionDeck();
+        loadMaze(0);
+        hideAllOverlays();
+        statusToast.classList.remove("visible");
+      }
+
+      function handlePlayerCaught() {
+        if (state.catchMode === "instant") {
+          triggerGameOver();
+          return;
+        }
+
+        // Mode B: 3 Lives
+        state.lives -= 1;
+        if (state.lives <= 0) {
+          state.lives = 0;
+          updateHud();
+          triggerGameOver();
+          return;
+        }
+
+        // Teleport hunter back to its starting corner (or fallback if player is standing right there)
+        let resetCol = state.hunterSpawnCell.col;
+        let resetRow = state.hunterSpawnCell.row;
+        if (resetCol === state.player.col && resetRow === state.player.row) {
+          resetCol = state.startCell.col;
+          resetRow = state.startCell.row;
+        }
+
+        state.hunter.col = resetCol;
+        state.hunter.row = resetRow;
+        state.hunter.fromCol = resetCol;
+        state.hunter.fromRow = resetRow;
+        state.hunter.visCol = resetCol;
+        state.hunter.visRow = resetRow;
+        state.hunter.animTime = MOVE_ANIM_DURATION;
+        state.hunterStepTimer = 0;
+        state.caughtFlashTimer = 0.85;
+
+        state.hunter.path = findPathAStar(
+          state.grid,
+          state.hunter.col,
+          state.hunter.row,
+          state.player.col,
+          state.player.row
+        );
+
+        updateHud();
+        const lifeWord = state.lives === 1 ? "life" : "lives";
+        showToast(`Caught! ${state.lives} ${lifeWord} left`, "wrong");
+      }
+
+      function triggerGameOver() {
+        state.mode = "gameover";
+        state.queuedDirection = null;
+        document.getElementById("gameOverKicker").textContent = `Caught in Maze ${state.mazeIndex + 1}`;
+        document.getElementById("gameOverDesc").textContent =
+          state.catchMode === "lives"
+            ? "You ran out of lives in the forest trails. Ready to restart?"
+            : "The monster caught you on the forest trails. Ready to restart?";
+        document.getElementById("overMoves").textContent = String(state.totalMoves);
+        document.getElementById("overQuiz").textContent = `${state.correctAnswers} correct / ${state.wrongAnswers} wrong`;
+        updateHud();
+        hideAllOverlays();
+        overlayGameOver.hidden = false;
+        document.getElementById("btnRetry").focus();
+      }
+
+      function triggerMazeCleared() {
+        state.queuedDirection = null;
+        if (state.mazeIndex >= MAZE_CONFIGS.length - 1) {
+          state.mode = "win";
+          document.getElementById("winTime").textContent = formatTime(state.elapsedSeconds);
+          document.getElementById("winCorrect").textContent = String(state.correctAnswers);
+          document.getElementById("winMoves").textContent = String(state.totalMoves);
+          document.getElementById("winWrong").textContent = String(state.wrongAnswers);
+          updateHud();
+          hideAllOverlays();
+          overlayWin.hidden = false;
+          document.getElementById("btnPlayAgain").focus();
+        } else {
+          state.mode = "cleared";
+          const nextCfg = MAZE_CONFIGS[state.mazeIndex + 1];
+          const nextTier = Math.min(SPEED_LADDER.length - 1, Math.max(nextCfg.baseTier, state.hunterTier));
+          document.getElementById("clearedKicker").textContent = `Maze ${state.mazeIndex + 1} of ${MAZE_CONFIGS.length} Complete`;
+          document.getElementById("clearedMoves").textContent = String(state.mazeMoves);
+          document.getElementById("clearedNextSpeed").textContent = formatSpeedFromTier(nextTier);
+          updateHud();
+          hideAllOverlays();
+          overlayCleared.hidden = false;
+          document.getElementById("btnNextMaze").focus();
+        }
+      }
+
+      function attemptPlayerMove(dc, dr) {
+        if (state.mode !== "playing") return;
+
+        // If player is still sliding between cells, buffer at most 1 directional input
+        if (state.player.animTime < MOVE_ANIM_DURATION) {
+          state.queuedDirection = { dc, dr };
+          return;
+        }
+
+        const nc = state.player.col + dc;
+        const nr = state.player.row + dr;
+        state.player.facingDc = dc;
+        state.player.facingDr = dr;
+
+        // Walls block movement without counting as a move
+        if (nc < 0 || nc >= state.size || nr < 0 || nr >= state.size || state.grid[nr][nc] === WALL) {
+          return;
+        }
+
+        // Execute player move
+        state.player.fromCol = state.player.col;
+        state.player.fromRow = state.player.row;
+        state.player.col = nc;
+        state.player.row = nr;
+        state.player.animTime = 0;
+        state.player.stepParity = 1 - state.player.stepParity;
+
+        state.totalMoves += 1;
+        state.mazeMoves += 1;
+        state.movesSinceQuiz += 1;
+
+        // Check if player reached exit first
+        if (nc === state.exitCell.col && nr === state.exitCell.row) {
+          updateHud();
+          triggerMazeCleared();
+          return;
+        }
+
+        // Check if player walked onto hunter's cell
+        if (nc === state.hunter.col && nr === state.hunter.row) {
+          updateHud();
+          handlePlayerCaught();
+          return;
+        }
+
+        // Recompute hunter's A* target path when player moves, without advancing the hunter
+        state.hunter.path = findPathAStar(
+          state.grid,
+          state.hunter.col,
+          state.hunter.row,
+          state.player.col,
+          state.player.row
+        );
+
+        updateHud();
+
+        // Trigger Rapid Fire once per maze at move 12, then regular quiz every 20 moves after Rapid Fire
+        if (state.mazeMoves === RAPID_FIRE_AT_MOVE && !state.rapidFireDoneThisMaze) {
+          state.movesSinceQuiz = 0;
+          openRapidFireWarning();
+        } else if (state.movesSinceQuiz >= REGULAR_QUIZ_INTERVAL) {
+          state.movesSinceQuiz = 0;
+          openQuizOverlay();
+        }
+      }
+
+      // Keyboard controls
+      window.addEventListener("keydown", (e) => {
+        if (state.mode === "playing") {
+          const dir = DIRECTIONS[e.code];
+          if (dir) {
+            e.preventDefault();
+            attemptPlayerMove(dir.dc, dir.dr);
+          }
+        } else if (state.mode === "quiz") {
+          if (!state.quizLocked) {
+            if (e.key === "1" || e.key === "2" || e.key === "3") {
+              e.preventDefault();
+              handleQuizAnswer(Number(e.key) - 1);
+            }
+          } else if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            resumeFromQuiz();
+          }
+        } else if (state.mode === "rapid_quiz") {
+          if (!state.rapidQuestionLocked && (e.key === "1" || e.key === "2" || e.key === "3")) {
+            e.preventDefault();
+            handleRapidAnswer(Number(e.key) - 1);
+          }
+        } else if (state.mode === "rapid_results" && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          resumeFromRapidFire();
+        } else if (state.mode === "start" && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          startNewRun();
+        } else if (state.mode === "cleared" && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          loadMaze(state.mazeIndex + 1);
+          hideAllOverlays();
+          state.mode = "playing";
+        } else if ((state.mode === "gameover" || state.mode === "win") && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          startNewRun();
+        }
+      });
+
+      // Touch swipe support on canvas
+      let touchStartX = null;
+      let touchStartY = null;
+      canvas.addEventListener("touchstart", (e) => {
+        if (e.touches.length !== 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+
+      canvas.addEventListener("touchend", (e) => {
+        if (touchStartX === null || touchStartY === null || e.changedTouches.length !== 1) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        touchStartX = null;
+        touchStartY = null;
+        if (Math.hypot(dx, dy) < 20) return;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          attemptPlayerMove(dx > 0 ? 1 : -1, 0);
+        } else {
+          attemptPlayerMove(0, dy > 0 ? 1 : -1);
+        }
+      }, { passive: true });
+
+      // Start Screen Catch Mode Selection & In-Game / Post-Run Mode Switching
+      const modeInstantBtn = document.getElementById("modeInstantBtn");
+      const modeLivesBtn = document.getElementById("modeLivesBtn");
+      function selectCatchMode(mode) {
+        state.catchMode = mode;
+        const isInstant = mode === "instant";
+        modeInstantBtn.classList.toggle("is-selected", isInstant);
+        modeInstantBtn.setAttribute("aria-checked", String(isInstant));
+        modeLivesBtn.classList.toggle("is-selected", !isInstant);
+        modeLivesBtn.setAttribute("aria-checked", String(!isInstant));
+        updateHud();
+      }
+      modeInstantBtn.addEventListener("click", () => selectCatchMode("instant"));
+      modeLivesBtn.addEventListener("click", () => selectCatchMode("lives"));
+
+      function switchCatchModeInGame() {
+        const nextMode = state.catchMode === "instant" ? "lives" : "instant";
+        selectCatchMode(nextMode);
+        btnHudSwitchMode.blur();
+        const label = nextMode === "lives"
+          ? `Switched to Mode B: 3 Lives (${state.lives} left)`
+          : "Switched to Mode A: Instant Game Over";
+        showToast(label, nextMode === "lives" ? "correct" : "wrong");
+      }
+
+      function switchCatchModeAndRestart() {
+        const nextMode = state.catchMode === "instant" ? "lives" : "instant";
+        selectCatchMode(nextMode);
+        startNewRun();
+      }
+
+      // Button event listeners
+      document.getElementById("btnStart").addEventListener("click", startNewRun);
+      document.getElementById("btnQuizContinue").addEventListener("click", resumeFromQuiz);
+      document.getElementById("btnRapidStart").addEventListener("click", beginRapidFireRound);
+      document.getElementById("btnRapidResume").addEventListener("click", resumeFromRapidFire);
+      btnHudSwitchMode.addEventListener("click", switchCatchModeInGame);
+      btnOverSwitchMode.addEventListener("click", switchCatchModeAndRestart);
+      btnWinSwitchMode.addEventListener("click", switchCatchModeAndRestart);
+      document.getElementById("btnNextMaze").addEventListener("click", () => {
+        state.mode = "playing";
+        loadMaze(state.mazeIndex + 1);
+        hideAllOverlays();
+      });
+      document.getElementById("btnRetry").addEventListener("click", startNewRun);
+      document.getElementById("btnPlayAgain").addEventListener("click", startNewRun);
+
+      /* ======================================================================
+       * 9. GAME LOOP (requestAnimationFrame + delta-time)
+       * ====================================================================== */
+      function easeOutQuad(t) {
+        return 1 - (1 - t) * (1 - t);
+      }
+
+      function updateEntityAnim(entity, dt) {
+        if (entity.animTime < MOVE_ANIM_DURATION) {
+          entity.animTime = Math.min(MOVE_ANIM_DURATION, entity.animTime + dt);
+          const progress = easeOutQuad(entity.animTime / MOVE_ANIM_DURATION);
+          entity.visCol = entity.fromCol + (entity.col - entity.fromCol) * progress;
+          entity.visRow = entity.fromRow + (entity.row - entity.fromRow) * progress;
+        } else {
+          entity.visCol = entity.col;
+          entity.visRow = entity.row;
+        }
+      }
+
+      function stepAutonomousHunter() {
+        state.hunter.path = findPathAStar(
+          state.grid,
+          state.hunter.col,
+          state.hunter.row,
+          state.player.col,
+          state.player.row
+        );
+
+        if (state.hunter.path.length >= 2) {
+          const nextStep = state.hunter.path[1];
+          state.hunter.fromCol = state.hunter.col;
+          state.hunter.fromRow = state.hunter.row;
+          state.hunter.facingDc = nextStep.col - state.hunter.col;
+          state.hunter.facingDr = nextStep.row - state.hunter.row;
+          state.hunter.col = nextStep.col;
+          state.hunter.row = nextStep.row;
+          state.hunter.animTime = 0;
+          state.hunter.stepParity = 1 - state.hunter.stepParity;
+
+          // Update remaining path after hunter step
+          state.hunter.path = findPathAStar(
+            state.grid,
+            state.hunter.col,
+            state.hunter.row,
+            state.player.col,
+            state.player.row
+          );
+        }
+
+        if (state.hunter.col === state.player.col && state.hunter.row === state.player.row) {
+          handlePlayerCaught();
+        }
+      }
+
+      let lastFrameTime = performance.now();
+      let hudSecondAccumulator = 0;
+
+      function gameLoop(now) {
+        const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+        state.pulseClock += dt;
+
+        // Smoothly finish character movement animations even right as cleared/gameover triggers
+        updateEntityAnim(state.player, dt);
+        updateEntityAnim(state.hunter, dt);
+
+        if (state.caughtFlashTimer > 0) {
+          state.caughtFlashTimer = Math.max(0, state.caughtFlashTimer - dt);
+        }
+
+        if (state.mode === "rapid_quiz" && !state.rapidQuestionLocked) {
+          state.rapidTimeLeft -= dt;
+          if (state.rapidTimeLeft <= 0) {
+            state.rapidTimeLeft = 0;
+            updateRapidTimerUI();
+            handleRapidAnswer(-1);
+          } else {
+            updateRapidTimerUI();
+          }
+        }
+
+        if (state.mode === "playing") {
+          state.elapsedSeconds += dt;
+
+          // Count down active quiz speed modifier in real time
+          if (state.speedModifierTimeLeft > 0) {
+            state.speedModifierTimeLeft = Math.max(0, state.speedModifierTimeLeft - dt);
+            if (state.speedModifierTimeLeft === 0) {
+              state.speedModifierType = "none";
+              updateHud();
+            }
+          }
+
+          // Autonomous hunter movement on its own timer regardless of player input
+          const stepSec = getEffectiveStepSec();
+          state.hunterStepTimer += dt;
+          if (state.hunterStepTimer >= stepSec && state.hunter.animTime >= MOVE_ANIM_DURATION) {
+            state.hunterStepTimer = Math.min(stepSec * 0.5, state.hunterStepTimer - stepSec);
+            stepAutonomousHunter();
+          }
+
+          hudSecondAccumulator += dt;
+          if (hudSecondAccumulator >= 0.25) {
+            hudSecondAccumulator = 0;
+            updateHud();
+          }
+
+          // Execute buffered movement key as soon as 120ms slide completes
+          if (state.mode === "playing" && state.player.animTime >= MOVE_ANIM_DURATION && state.queuedDirection) {
+            const nextDir = state.queuedDirection;
+            state.queuedDirection = null;
+            attemptPlayerMove(nextDir.dc, nextDir.dr);
+          }
+        }
+
+        renderScene();
+        requestAnimationFrame(gameLoop);
+      }
+
+      /* ======================================================================
+       * 10. INITIALIZATION & RESPONSIVE CANVAS SIZING
+       * ====================================================================== */
+      function resizeCanvas() {
+        const rect = stageEl.getBoundingClientRect();
+        const availW = Math.max(240, rect.width - 28);
+        const availH = Math.max(240, rect.height - 24);
+        const maxSquare = Math.floor(Math.min(availW, availH));
+
+        // Snap board size to an exact multiple of grid cells for crisp square tiles
+        cellSize = Math.max(10, Math.floor(maxSquare / state.size));
+        boardPixelSize = cellSize * state.size;
+
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = boardPixelSize * dpr;
+        canvas.height = boardPixelSize * dpr;
+        canvas.style.width = boardPixelSize + "px";
+        canvas.style.height = boardPixelSize + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      window.addEventListener("resize", () => {
+        resizeCanvas();
+        renderScene();
+      });
+
+      // Boot: generate initial Maze 1 behind the Start screen
+      buildFreshQuestionDeck();
+      loadMaze(0);
+      requestAnimationFrame((t) => {
+        lastFrameTime = t;
+        requestAnimationFrame(gameLoop);
+      });
+    })();
+  </script>
+</body>
+</html>
